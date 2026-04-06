@@ -19,9 +19,11 @@ public class Tab3_OrganizationPanel extends JPanel {
     private JTable table;
     private JTextArea txtViTriChinhThuc;
     private JTextArea txtViTriDuBi;
+    private boolean isCalculating = false;
 
     // Các cột số cần tính tổng: SQ(1), QNCN+HSQ(2), +(3), Bộ phận HCKT(5), Dự bị(6), T.cường cho dưới(7)
     private static final int[] SUM_COLUMNS = {1, 2, 3, 5, 6, 7};
+    private static final Color SLATE_TEXT = new Color(30, 41, 59);
 
     public Tab3_OrganizationPanel() {
         setLayout(new BorderLayout());
@@ -34,31 +36,29 @@ public class Tab3_OrganizationPanel extends JPanel {
 
         JLabel lblTitle = new JLabel("III. TỔ CHỨC, SỬ DỤNG LỰC LƯỢNG, BỐ TRÍ");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        lblTitle.setForeground(new Color(30, 41, 59));
+        lblTitle.setForeground(SLATE_TEXT);
         lblTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
         mainContainer.add(lblTitle);
         mainContainer.add(Box.createVerticalStrut(25));
 
-        // ============================================================
         // 1. Tổ chức lực lượng
-        // ============================================================
         mainContainer.add(UIUtils.createSectionLabel("1. Tổ chức lực lượng"));
+        mainContainer.add(Box.createVerticalStrut(10));
         mainContainer.add(createTablePanel());
         mainContainer.add(Box.createVerticalStrut(25));
 
-        // ============================================================
         // 2. Bố trí
-        // ============================================================
-        mainContainer.add(UIUtils.createSectionLabel("2. Bố trí"));
+        mainContainer.add(UIUtils.createSectionLabel("2. Bố trí hậu cần kĩ thuật"));
+        mainContainer.add(Box.createVerticalStrut(10));
 
         mainContainer.add(UIUtils.createSubSectionLabel("Vị trí chính thức:"));
-        txtViTriChinhThuc = UIUtils.createStandardTextArea();
-        mainContainer.add(UIUtils.createTextAreaScroll(txtViTriChinhThuc, 100));
+        txtViTriChinhThuc = createModernTextArea();
+        mainContainer.add(createTextAreaScrollWithBorder(txtViTriChinhThuc, 80));
         mainContainer.add(Box.createVerticalStrut(15));
 
         mainContainer.add(UIUtils.createSubSectionLabel("Vị trí dự bị:"));
-        txtViTriDuBi = UIUtils.createStandardTextArea();
-        mainContainer.add(UIUtils.createTextAreaScroll(txtViTriDuBi, 100));
+        txtViTriDuBi = createModernTextArea();
+        mainContainer.add(createTextAreaScrollWithBorder(txtViTriDuBi, 80));
         mainContainer.add(Box.createVerticalStrut(20));
 
         JScrollPane mainScroll = new JScrollPane(mainContainer);
@@ -68,251 +68,206 @@ public class Tab3_OrganizationPanel extends JPanel {
         add(mainScroll, BorderLayout.CENTER);
     }
 
+    private JTextArea createModernTextArea() {
+        JTextArea area = new JTextArea();
+        area.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        area.setForeground(SLATE_TEXT);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        return area;
+    }
+
+    private JScrollPane createTextAreaScrollWithBorder(JTextArea textArea, int preferredHeight) {
+        JScrollPane scroll = new JScrollPane(textArea);
+        scroll.setBorder(new LineBorder(new Color(203, 213, 225), 1));
+        scroll.setPreferredSize(new Dimension(800, preferredHeight));
+        scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, preferredHeight));
+        scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        UIUtils.makeScrollPassThrough(scroll);
+        return scroll;
+    }
+
     private JPanel createTablePanel() {
-        JPanel pnl = new JPanel(new BorderLayout(0, 5));
-        pnl.setBackground(Color.WHITE);
+        JPanel pnl = new JPanel(new BorderLayout(0, 0));
+        pnl.setOpaque(false);
         pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        pnl.setPreferredSize(new Dimension(900, 320));
-        pnl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 320));
+        pnl.setMaximumSize(new Dimension(900, 400)); // Nới rộng xíu để chứa 11 dòng
 
-        JPanel pnlControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        pnlControls.setBackground(Color.WHITE);
-
-        JButton btnAdd = UIUtils.createStyledButton("➕ Thêm dòng", new Color(41, 128, 185));
-        JButton btnDel = UIUtils.createStyledButton("➖ Xóa dòng", new Color(231, 76, 60));
-
-        pnlControls.add(btnAdd);
-        pnlControls.add(Box.createHorizontalStrut(10));
-        pnlControls.add(btnDel);
-
-        pnl.add(pnlControls, BorderLayout.NORTH);
-
-        // Cột theo đúng mẫu doc
-        String[] cols = {
-                "Tên lực lượng",  // 0
-                "SQ",             // 1
-                "QNCN + HSQ",     // 2
-                "+",              // 3
-                "Khả năng",       // 4
-                "Bộ phận HCKT",   // 5
-                "Dự bị",          // 6
-                "T.cường cho dưới" // 7
-        };
+        int[] w = {150, 60, 100, 60, 150, 120, 80, 130};
+        String[] cols = new String[8]; for (int i=0; i<8; i++) cols[i] = "";
 
         model = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                // Dòng cuối cùng (dòng Cộng) không cho sửa
-                if (row == getRowCount() - 1) {
-                    return false;
-                }
-                return true;
+                return row != 10; // Cố định 10 dòng nhập (index 0->9), dòng 10 (Cộng) khóa lại
             }
         };
 
-        // Thêm dòng "Cộng" mặc định
+        // KẺ SẴN 10 DÒNG TRỐNG
+        for (int i = 0; i < 10; i++) {
+            model.addRow(new Object[]{"", "", "", "", "", "", "", ""});
+        }
+        // DÒNG 11 LÀ DÒNG CỘNG
         model.addRow(new Object[]{"Cộng", "", "", "", "", "", "", ""});
 
         table = new JTable(model);
         table.setRowHeight(35);
-        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
-        table.getTableHeader().setBackground(new Color(241, 245, 249));
-        table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        table.setTableHeader(null);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 
-        // Renderer cho dòng "Cộng" — in đậm, nền khác
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override
-            public Component getTableCellRendererComponent(JTable tbl, Object value,
-                                                           boolean isSelected, boolean hasFocus, int row, int column) {
+            public Component getTableCellRendererComponent(JTable tbl, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 Component c = super.getTableCellRendererComponent(tbl, value, isSelected, hasFocus, row, column);
 
-                if (row == model.getRowCount() - 1) {
-                    // Dòng Cộng
-                    c.setFont(new Font("Segoe UI", Font.BOLD, 13));
-                    if (!isSelected) {
-                        c.setBackground(new Color(254, 249, 195)); // Vàng nhạt
-                        c.setForeground(new Color(30, 41, 59));
-                    }
+                ((JComponent) c).setBorder(BorderFactory.createMatteBorder(0, 0, 1, column == 7 ? 0 : 1, new Color(226, 232, 240)));
+
+                if (row == 10) { // Dòng Cộng
+                    c.setFont(new Font("Times New Roman", Font.BOLD, 15));
+                    c.setBackground(new Color(241, 245, 249)); // Màu xám nhạt
+                    c.setForeground(Color.BLACK);
                 } else {
-                    c.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    if (!isSelected) {
-                        c.setBackground(Color.WHITE);
-                        c.setForeground(new Color(30, 41, 59));
-                    }
+                    c.setFont(new Font("Times New Roman", Font.PLAIN, 15));
+                    if (isSelected) c.setBackground(new Color(219, 234, 254));
+                    else c.setBackground(Color.WHITE);
+                    c.setForeground(Color.BLACK);
                 }
 
-                // Căn giữa cho cột số
-                if (column >= 1 && column <= 3 || column >= 5 && column <= 7) {
-                    setHorizontalAlignment(SwingConstants.CENTER);
-                } else {
-                    setHorizontalAlignment(SwingConstants.LEFT);
-                }
+                if (column == 0 || column == 4) setHorizontalAlignment(SwingConstants.LEFT);
+                else setHorizontalAlignment(SwingConstants.CENTER);
 
                 return c;
             }
         });
 
-        // Lắng nghe thay đổi dữ liệu để tự động cập nhật dòng Cộng
-        model.addTableModelListener(new TableModelListener() {
-            private boolean updating = false;
+        for (int i = 0; i < w.length; i++) {
+            table.getColumnModel().getColumn(i).setPreferredWidth(w[i]);
+            table.getColumnModel().getColumn(i).setMinWidth(w[i]);
+            table.getColumnModel().getColumn(i).setMaxWidth(w[i]);
+        }
 
+        // Tự động cộng tổng
+        model.addTableModelListener(new TableModelListener() {
             @Override
             public void tableChanged(TableModelEvent e) {
-                if (updating) return;
-                // Chỉ tính lại khi sửa dữ liệu (không phải dòng Cộng)
+                if (isCalculating) return;
                 if (e.getType() == TableModelEvent.UPDATE) {
                     int row = e.getFirstRow();
-                    if (row < model.getRowCount() - 1) {
-                        updating = true;
+                    if (row < 10) { // Nếu sửa trong 10 dòng đầu
+                        isCalculating = true;
                         recalculateSum();
-                        updating = false;
+                        isCalculating = false;
                     }
                 }
             }
         });
 
+        JPanel headerPanel = createHeader(w);
+        JViewport viewport = new JViewport();
+        viewport.setView(headerPanel);
+        viewport.setPreferredSize(headerPanel.getPreferredSize());
+
         JScrollPane scroll = new JScrollPane(table);
-        scroll.setBorder(new LineBorder(new Color(203, 213, 225), 1));
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getHorizontalScrollBar().addAdjustmentListener(e -> viewport.setViewPosition(new Point(e.getValue(), 0)));
         UIUtils.makeScrollPassThrough(scroll);
 
-        pnl.add(scroll, BorderLayout.CENTER);
+        JPanel combined = new JPanel(new BorderLayout());
+        combined.setBorder(new LineBorder(new Color(203, 213, 225), 1));
 
-        btnAdd.addActionListener(e -> {
-            // Không tính dòng Cộng, tối đa 10 dòng dữ liệu
-            int dataRowCount = model.getRowCount() - 1;
-            if (dataRowCount >= 10) {
-                JOptionPane.showMessageDialog(this, "Tối đa 10 dòng để phù hợp biểu mẫu.");
-                return;
-            }
-            // Chèn trước dòng Cộng
-            int insertIndex = model.getRowCount() - 1;
-            model.insertRow(insertIndex, new Object[]{"", "", "", "", "", "", "", ""});
-            refreshTenLuong();
-            recalculateSum();
-        });
+        JPanel headerWrapper = new JPanel(new BorderLayout());
+        headerWrapper.add(viewport, BorderLayout.CENTER);
+        int scrollWidth = UIManager.getInt("ScrollBar.width");
+        if (scrollWidth == 0) scrollWidth = 17;
+        JPanel spacer = new JPanel(); spacer.setPreferredSize(new Dimension(scrollWidth, 60)); spacer.setBackground(new Color(241, 245, 249)); spacer.setBorder(BorderFactory.createMatteBorder(0,0,1,0,new Color(203, 213, 225)));
+        headerWrapper.add(spacer, BorderLayout.EAST);
 
-        btnDel.addActionListener(e -> {
-            int selectedRow = table.getSelectedRow();
-            if (selectedRow != -1 && selectedRow < model.getRowCount() - 1) {
-                // Không cho xóa dòng Cộng
-                model.removeRow(selectedRow);
-                refreshTenLuong();
-                recalculateSum();
-            } else if (selectedRow == model.getRowCount() - 1) {
-                JOptionPane.showMessageDialog(this, "Không thể xóa dòng Cộng.");
-            }
-        });
+        combined.add(headerWrapper, BorderLayout.NORTH);
+        combined.add(scroll, BorderLayout.CENTER);
+        pnl.add(combined, BorderLayout.CENTER);
 
         return pnl;
     }
 
-    /**
-     * Không tự động đánh STT số nữa, vì cột đầu là "Tên lực lượng" (text).
-     * Chỉ đảm bảo dòng cuối luôn là "Cộng".
-     */
-    private void refreshTenLuong() {
-        int lastRow = model.getRowCount() - 1;
-        model.setValueAt("Cộng", lastRow, 0);
+    private JPanel createHeader(int[] w) {
+        JPanel p = new JPanel(null); p.setBackground(new Color(241, 245, 249));
+        int totalWidth = 0; for (int width : w) totalWidth += width;
+        p.setPreferredSize(new Dimension(totalWidth, 60));
+        int[] x = new int[9]; x[0]=0; for(int i=0; i<8; i++) x[i+1] = x[i]+w[i];
+
+        p.add(UIUtils.createAbsoluteHeaderLabel("Tên lực lượng", x[0], 0, w[0], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Quân số", x[1], 0, w[1]+w[2]+w[3], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Khả năng", x[4], 0, w[4], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Phân chia", x[5], 0, w[5]+w[6]+w[7], 30));
+
+        p.add(UIUtils.createAbsoluteHeaderLabel("SQ", x[1], 30, w[1], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>QNCN<br>HSQ</center></html>", x[2], 30, w[2], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("+", x[3], 30, w[3], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Bộ phận HCKT", x[5], 30, w[5], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Dự bị", x[6], 30, w[6], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>T.cường<br>cho dưới</center></html>", x[7], 30, w[7], 30));
+
+        return p;
     }
 
-    /**
-     * Tự động tính tổng các cột số và cập nhật dòng Cộng.
-     */
     private void recalculateSum() {
-        int lastRow = model.getRowCount() - 1;
-        if (lastRow < 0) return;
-
         for (int col : SUM_COLUMNS) {
             int sum = 0;
             boolean hasValue = false;
-            for (int row = 0; row < lastRow; row++) {
+            for (int row = 0; row < 10; row++) {
                 int val = parseIntSafe(getCellValue(row, col));
-                if (val != 0) hasValue = true;
+                if (val != 0 || !getCellValue(row, col).isEmpty()) hasValue = true;
                 sum += val;
             }
-            model.setValueAt(hasValue ? String.valueOf(sum) : "", lastRow, col);
+            model.setValueAt(hasValue ? String.valueOf(sum) : "", 10, col);
         }
-
-        // Cột "Khả năng" (4) không tính tổng — để trống
-        model.setValueAt("", lastRow, 4);
-        // Cột "Tên lực lượng" (0) luôn là "Cộng"
-        model.setValueAt("Cộng", lastRow, 0);
+        model.setValueAt("", 10, 4); // Cột Khả năng trống
+        model.setValueAt("Cộng", 10, 0); // Cột tên là Cộng
     }
 
     private int parseIntSafe(String text) {
         if (text == null || text.trim().isEmpty()) return 0;
-        try {
-            return Integer.parseInt(text.trim());
-        } catch (NumberFormatException e) {
-            // Thử parse số có tiền tố 0 như "03"
-            try {
-                return Integer.parseInt(text.trim().replaceAll("^0+", ""));
-            } catch (NumberFormatException e2) {
-                return 0;
-            }
-        }
+        try { return Integer.parseInt(text.trim().replaceAll("^0+", "")); }
+        catch (NumberFormatException e) { return 0; }
     }
 
+    // =========================================================================
+    // XUẤT TỪNG KEYWORD RA WORD (THAY THẾ CHUỖI HTML)
+    // =========================================================================
     public Map<String, String> getExportData() {
         Map<String, String> data = new HashMap<>();
 
-        data.put("{{rows_bang_to_chuc_luc_luong}}", buildRowsHtml());
-        data.put("{{vi_tri_chinh_thuc}}", txtViTriChinhThuc.getText().trim());
-        data.put("{{vi_tri_du_bi}}", txtViTriDuBi.getText().trim());
+        // Loop xuất 10 dòng (i từ 0 đến 9)
+        // Cú pháp keyword: <<tcll_cột_dòng>>. VD dòng 1 cột SQ: <<tcll_sq_1>>
+        for (int i = 0; i < 10; i++) {
+            int r = i + 1; // Dòng 1 -> 10
+            data.put("<<tcll_name_" + r + ">>", getCellValue(i, 0));
+            data.put("<<tcll_sq_" + r + ">>", getCellValue(i, 1));
+            data.put("<<tcll_qn_" + r + ">>", getCellValue(i, 2));
+            data.put("<<tcll_cong_" + r + ">>", getCellValue(i, 3));
+            data.put("<<tcll_kn_" + r + ">>", getCellValue(i, 4));
+            data.put("<<tcll_hckt_" + r + ">>", getCellValue(i, 5));
+            data.put("<<tcll_db_" + r + ">>", getCellValue(i, 6));
+            data.put("<<tcll_tc_" + r + ">>", getCellValue(i, 7));
+        }
+
+        // Xuất dòng Cộng (Dòng số 10 trong JTable)
+        data.put("<<tcll_sq_sum>>", getCellValue(10, 1));
+        data.put("<<tcll_qn_sum>>", getCellValue(10, 2));
+        data.put("<<tcll_cong_sum>>", getCellValue(10, 3));
+        data.put("<<tcll_hckt_sum>>", getCellValue(10, 5));
+        data.put("<<tcll_db_sum>>", getCellValue(10, 6));
+        data.put("<<tcll_tc_sum>>", getCellValue(10, 7));
+
+        data.put("<<vi_tri_chinh_thuc>>", txtViTriChinhThuc.getText().trim());
+        data.put("<<vi_tri_du_bi>>", txtViTriDuBi.getText().trim());
 
         return data;
-    }
-
-    private String buildRowsHtml() {
-        StringBuilder sb = new StringBuilder();
-
-        if (model.getRowCount() <= 1) {
-            // Chỉ có dòng Cộng, không có dữ liệu
-            sb.append("<tr>")
-                    .append("<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>")
-                    .append("</tr>");
-            return sb.toString();
-        }
-
-        // Các dòng dữ liệu (không bao gồm dòng Cộng)
-        for (int i = 0; i < model.getRowCount() - 1; i++) {
-            sb.append("<tr>");
-            for (int j = 0; j < model.getColumnCount(); j++) {
-                String cellValue = escapeHtml(getCellValue(i, j));
-                if (j == 0 || j == 4) {
-                    sb.append("<td class='text-left'>").append(cellValue).append("</td>");
-                } else {
-                    sb.append("<td>").append(cellValue).append("</td>");
-                }
-            }
-            sb.append("</tr>");
-        }
-
-        // Dòng Cộng (dòng cuối)
-        int lastRow = model.getRowCount() - 1;
-        sb.append("<tr style='font-weight:bold;'>");
-        for (int j = 0; j < model.getColumnCount(); j++) {
-            String cellValue = escapeHtml(getCellValue(lastRow, j));
-            if (j == 0) {
-                sb.append("<td class='text-left'><b>").append(cellValue).append("</b></td>");
-            } else {
-                sb.append("<td><b>").append(cellValue).append("</b></td>");
-            }
-        }
-        sb.append("</tr>");
-
-        return sb.toString();
     }
 
     private String getCellValue(int row, int col) {
         Object value = model.getValueAt(row, col);
         return value == null ? "" : String.valueOf(value).trim();
-    }
-
-    private String escapeHtml(String text) {
-        return text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
     }
 }

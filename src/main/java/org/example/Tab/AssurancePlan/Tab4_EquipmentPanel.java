@@ -13,25 +13,33 @@ import java.awt.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class Tab4_EquipmentPanel extends JPanel {
 
-    private final int[] colWidths = {120, 220, 60, 70, 70, 70, 60, 60, 110, 80, 110, 110, 110};
+    private final int[] colWidths = {120, 160, 60, 70, 70, 70, 60, 60, 100, 80, 110, 110, 110};
 
     private DefaultTableModel model;
     private JTable table;
 
-    private JTextArea txtGiaiDoanChuanBi;
-    private JTextArea txtGiaiDoanChienDau;
+    private JTextArea txtChuanBi;
+    private JTextArea txtChienDau;
     private JTextArea txtSauChienDau;
 
-    // Lưu lại Session ID để nút Refresh sử dụng
     private int currentSessionId = -1;
+    private static final Color SLATE_TEXT = new Color(30, 41, 59);
+
+    // 5 Nhóm cố định
+    private final String[] groups = {"dBB1+PT", "Hướng PN chủ yếu", "Hướng PN thứ yếu", "Hướng PN phía sau", "Lực lượng còn lại"};
+    // 11 Loại vũ khí cố định cho mỗi nhóm
+    private final String[] weapons = {
+            "SMPK 12,7mm", "Cối 100mm/e", "Cối 82mm/d", "Cối 60mm", "Súng SPG-9",
+            "Súng B41", "Súng đại liên", "Súng trung liên", "Súng tiểu liên", "Súng ngắn", "Lựu đạn"
+    };
+    private final String[] units = {
+            "Khẩu", "Khẩu", "Khẩu", "Khẩu", "Khẩu", "Khẩu", "Khẩu", "Khẩu", "Khẩu", "Khẩu", "quả"
+    };
 
     public Tab4_EquipmentPanel() {
         setLayout(new BorderLayout());
@@ -44,54 +52,98 @@ public class Tab4_EquipmentPanel extends JPanel {
 
         JLabel lblTitle = new JLabel("IV. BẢO ĐẢM TRANG BỊ KỸ THUẬT");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        lblTitle.setForeground(new Color(30, 41, 59));
+        lblTitle.setForeground(SLATE_TEXT);
         lblTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
         mainContainer.add(lblTitle);
-        mainContainer.add(Box.createVerticalStrut(20));
-
-        mainContainer.add(createTableSection());
         mainContainer.add(Box.createVerticalStrut(25));
-        mainContainer.add(createMeasuresSection());
+
+        // 1. Chỉ tiêu (Bảng 55 dòng)
+        mainContainer.add(UIUtils.createSectionLabel("1. Chỉ tiêu"));
+        mainContainer.add(Box.createVerticalStrut(10));
+        mainContainer.add(createTablePanel());
+        mainContainer.add(Box.createVerticalStrut(25));
+
+        // 2. Ý định, biện pháp
+        mainContainer.add(UIUtils.createSectionLabel("2. Ý định, biện pháp bảo đảm"));
+        mainContainer.add(Box.createVerticalStrut(10));
+
+        mainContainer.add(UIUtils.createSubSectionLabel("Giai đoạn chuẩn bị:"));
+        txtChuanBi = createModernTextArea();
+        mainContainer.add(createTextAreaScrollWithBorder(txtChuanBi, 80));
+        mainContainer.add(Box.createVerticalStrut(15));
+
+        mainContainer.add(UIUtils.createSubSectionLabel("Giai đoạn chiến đấu:"));
+        txtChienDau = createModernTextArea();
+        mainContainer.add(createTextAreaScrollWithBorder(txtChienDau, 80));
+        mainContainer.add(Box.createVerticalStrut(15));
+
+        mainContainer.add(UIUtils.createSubSectionLabel("Sau chiến đấu:"));
+        txtSauChienDau = createModernTextArea();
+        mainContainer.add(createTextAreaScrollWithBorder(txtSauChienDau, 80));
+        mainContainer.add(Box.createVerticalStrut(20));
 
         JScrollPane mainScroll = new JScrollPane(mainContainer);
         mainScroll.setBorder(null);
         mainScroll.getVerticalScrollBar().setUnitIncrement(16);
+
         add(mainScroll, BorderLayout.CENTER);
     }
 
-    private JPanel createTableSection() {
-        JPanel tableContainer = new JPanel(new BorderLayout(0, 10));
-        tableContainer.setBackground(Color.WHITE);
-        tableContainer.setAlignmentX(Component.LEFT_ALIGNMENT);
-        tableContainer.setPreferredSize(new Dimension(1000, 400));
-        tableContainer.setMaximumSize(new Dimension(Integer.MAX_VALUE, 400));
+    private JTextArea createModernTextArea() {
+        JTextArea area = new JTextArea();
+        area.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        area.setForeground(SLATE_TEXT);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        return area;
+    }
+
+    private JScrollPane createTextAreaScrollWithBorder(JTextArea textArea, int preferredHeight) {
+        JScrollPane scroll = new JScrollPane(textArea);
+        scroll.setBorder(new LineBorder(new Color(203, 213, 225), 1));
+        scroll.setPreferredSize(new Dimension(800, preferredHeight));
+        scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, preferredHeight));
+        scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        UIUtils.makeScrollPassThrough(scroll);
+        return scroll;
+    }
+
+    private JPanel createTablePanel() {
+        JPanel pnl = new JPanel(new BorderLayout(0, 10));
+        pnl.setBackground(Color.WHITE);
+        pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        pnl.setPreferredSize(new Dimension(1100, 500));
+        pnl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 500));
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBackground(Color.WHITE);
-        topPanel.add(UIUtils.createSectionLabel("1. Chỉ tiêu"), BorderLayout.WEST);
+        JButton btnRefresh = UIUtils.createStyledButton("🔄 Làm mới dữ liệu DB", new Color(46, 204, 113));
+        topPanel.add(btnRefresh, BorderLayout.EAST);
+        pnl.add(topPanel, BorderLayout.NORTH);
 
-        JPanel pnlControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        pnlControls.setBackground(Color.WHITE);
-        JButton btnRefresh = UIUtils.createStyledButton("🔄 Làm mới dữ liệu", new Color(46, 204, 113));
-        pnlControls.add(btnRefresh);
-        topPanel.add(pnlControls, BorderLayout.EAST);
+        String[] columnNames = new String[13]; for(int i=0; i<13; i++) columnNames[i]="";
 
-        tableContainer.add(topPanel, BorderLayout.NORTH);
-
-        String[] columnNames = {"Đơn vị", "Tên TBKT", "ĐVT", "Nhu cầu", "Tổng số", "Số tốt", "K_bđ", "K_t", "Phải có", "Số lượng", "Thời gian", "Địa điểm", "Phương thức"};
         model = new DefaultTableModel(columnNames, 0) {
             @Override
-            public boolean isCellEditable(int row, int column) { return column > 0; }
+            public boolean isCellEditable(int row, int column) { return column > 2; } // Khóa 3 cột đầu
         };
+
+        // KHỞI TẠO 55 DÒNG CỐ ĐỊNH (5 nhóm x 11 vũ khí)
+        for (int i = 0; i < groups.length; i++) {
+            for (int j = 0; j < weapons.length; j++) {
+                String groupName = (j == 0) ? groups[i] : ""; // Chỉ hiện tên nhóm ở dòng đầu
+                model.addRow(new Object[]{
+                        groupName, weapons[j], units[j], "", "", "", "", "", "", "", "", "", ""
+                });
+            }
+        }
 
         table = new JTable(model);
         table.setRowHeight(35);
         table.setTableHeader(null);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        table.setShowGrid(false);
-        table.setIntercellSpacing(new Dimension(0, 0));
 
-        // Áp dụng viền và KÍCH THƯỚC CHUẨN để không bị lệch cột
         setupCustomRenderers();
 
         JPanel headerPanel = createAbsoluteHeader();
@@ -102,59 +154,46 @@ public class Tab4_EquipmentPanel extends JPanel {
         JScrollPane tableScroll = new JScrollPane(table);
         tableScroll.setBorder(BorderFactory.createEmptyBorder());
         UIUtils.makeScrollPassThrough(tableScroll);
-
         tableScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-
-        tableScroll.getHorizontalScrollBar().addAdjustmentListener(e ->
-                headerViewport.setViewPosition(new Point(e.getValue(), 0))
-        );
+        tableScroll.getHorizontalScrollBar().addAdjustmentListener(e -> headerViewport.setViewPosition(new Point(e.getValue(), 0)));
 
         JPanel combinedTablePanel = new JPanel(new BorderLayout());
         combinedTablePanel.setBorder(new LineBorder(new Color(203, 213, 225), 1));
 
         JPanel headerWrapper = new JPanel(new BorderLayout());
         headerWrapper.add(headerViewport, BorderLayout.CENTER);
-
         int scrollWidth = UIManager.getInt("ScrollBar.width");
         if (scrollWidth == 0) scrollWidth = 17;
-
-        JPanel spacer = new JPanel();
-        spacer.setPreferredSize(new Dimension(scrollWidth, 60));
-        spacer.setBackground(new Color(241, 245, 249));
-        spacer.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(203, 213, 225)));
+        JPanel spacer = new JPanel(); spacer.setPreferredSize(new Dimension(scrollWidth, 60)); spacer.setBackground(new Color(241, 245, 249)); spacer.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(203, 213, 225)));
         headerWrapper.add(spacer, BorderLayout.EAST);
 
         combinedTablePanel.add(headerWrapper, BorderLayout.NORTH);
         combinedTablePanel.add(tableScroll, BorderLayout.CENTER);
-
-        tableContainer.add(combinedTablePanel, BorderLayout.CENTER);
+        pnl.add(combinedTablePanel, BorderLayout.CENTER);
 
         btnRefresh.addActionListener(e -> {
-            if (this.currentSessionId > 0) {
-                loadDataFromDatabase(this.currentSessionId);
-            } else {
-                JOptionPane.showMessageDialog(this, "Chưa có phiên làm việc hợp lệ!", "Cảnh báo", JOptionPane.WARNING_MESSAGE);
-            }
+            if (this.currentSessionId > 0) loadDataFromDatabase(this.currentSessionId);
+            else JOptionPane.showMessageDialog(this, "Chưa có phiên làm việc hợp lệ!", "Cảnh báo", JOptionPane.WARNING_MESSAGE);
         });
 
-        return tableContainer;
+        return pnl;
     }
 
     // =====================================================================
-    // CHỈ ĐỌC DATA TỪ DATABASE - BỎ HẾT DỮ LIỆU TĨNH KHÁC
+    // ÁNH XẠ DỮ LIỆU TỪ DB VÀO BẢNG CỐ ĐỊNH
     // =====================================================================
     public void loadDataFromDatabase(int sessionId) {
         this.currentSessionId = sessionId;
-        model.setRowCount(0);
         if (sessionId <= 0) return;
 
-        List<Object[]> groupTotal = new ArrayList<>(); // dBB1+PT
-        List<Object[]> groupCY = new ArrayList<>();    // Hướng CY
-        List<Object[]> groupTY = new ArrayList<>();    // Hướng TY
-        List<Object[]> groupSau = new ArrayList<>();   // Phía sau
-        List<Object[]> groupCL = new ArrayList<>();    // Còn lại
+        // Xóa sạch dữ liệu nhập cũ (từ cột 3 trở đi)
+        for (int r = 0; r < model.getRowCount(); r++) {
+            for (int c = 3; c < model.getColumnCount(); c++) {
+                model.setValueAt("", r, c);
+            }
+        }
 
-        String sql = "SELECT vat_chat, dvt, dt_chitiet, pc04_chitiet FROM step4_quy_dinh_du_tru WHERE session_id = ?";
+        String sql = "SELECT vat_chat, dt_chitiet, pc04_chitiet FROM step4_quy_dinh_du_tru WHERE session_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -164,70 +203,53 @@ public class Tab4_EquipmentPanel extends JPanel {
 
             while (rs.next()) {
                 String vatChat = rs.getString("vat_chat");
-                String dvt = rs.getString("dvt");
+                if (vatChat == null) continue;
+                String vcLower = vatChat.toLowerCase();
 
-                // CHỈ lọc ra VŨ KHÍ, TBKT
-                boolean isWeapon = false;
-                if (dvt != null && (dvt.equalsIgnoreCase("Khẩu") || dvt.equalsIgnoreCase("Cơ sở"))) {
-                    isWeapon = true;
-                } else if (vatChat != null) {
-                    String lower = vatChat.toLowerCase();
-                    if (lower.contains("súng") || lower.contains("cối") || lower.contains("smpk") || lower.contains("spg") || lower.contains("b41")) {
-                        isWeapon = true;
-                    }
-                }
+                // Dò xem loại vũ khí này thuộc index thứ mấy trong mảng weapons (0 -> 10)
+                int weaponIndex = -1;
+                if (vcLower.contains("12,7")) weaponIndex = 0;
+                else if (vcLower.contains("100mm")) weaponIndex = 1;
+                else if (vcLower.contains("82mm")) weaponIndex = 2;
+                else if (vcLower.contains("60mm")) weaponIndex = 3;
+                else if (vcLower.contains("spg")) weaponIndex = 4;
+                else if (vcLower.contains("b41")) weaponIndex = 5;
+                else if (vcLower.contains("đại liên")) weaponIndex = 6;
+                else if (vcLower.contains("trung liên")) weaponIndex = 7;
+                else if (vcLower.contains("tiểu liên") || vcLower.contains("ak")) weaponIndex = 8;
+                else if (vcLower.contains("ngắn")) weaponIndex = 9;
+                else if (vcLower.contains("lựu đạn")) weaponIndex = 10;
 
-                if (!isWeapon) continue;
+                if (weaponIndex == -1) continue; // Bỏ qua nếu không phải vũ khí trong ds
 
                 String[] dtArr = rs.getString("dt_chitiet") != null ? rs.getString("dt_chitiet").split(",") : new String[0];
                 String[] pcArr = rs.getString("pc04_chitiet") != null ? rs.getString("pc04_chitiet").split(",") : new String[0];
-
                 double[] dt = parseArray(dtArr);
                 double[] pc = parseArray(pcArr);
 
-                double totalDt = dt[2] + dt[3] + dt[4] + dt[5];
-                double totalPc = pc[2] + pc[3] + pc[4] + pc[5];
-
-                if (totalDt > 0 || totalPc > 0) groupTotal.add(createRow("", vatChat, dvt, totalDt, totalPc));
-                if (dt[2] > 0 || pc[2] > 0) groupCY.add(createRow("", vatChat, dvt, dt[2], pc[2]));
-                if (dt[3] > 0 || pc[3] > 0) groupTY.add(createRow("", vatChat, dvt, dt[3], pc[3]));
-                if (dt[4] > 0 || pc[4] > 0) groupSau.add(createRow("", vatChat, dvt, dt[4], pc[4]));
-                if (dt[5] > 0 || pc[5] > 0) groupCL.add(createRow("", vatChat, dvt, dt[5], pc[5]));
+                // Map vào 5 nhóm
+                // Nhóm 0: dBB1+PT (Tổng)
+                fillRowData(0 * 11 + weaponIndex, dt[2]+dt[3]+dt[4]+dt[5], pc[2]+pc[3]+pc[4]+pc[5]);
+                // Nhóm 1: CY
+                fillRowData(1 * 11 + weaponIndex, dt[2], pc[2]);
+                // Nhóm 2: TY
+                fillRowData(2 * 11 + weaponIndex, dt[3], pc[3]);
+                // Nhóm 3: Phía sau
+                fillRowData(3 * 11 + weaponIndex, dt[4], pc[4]);
+                // Nhóm 4: Còn lại
+                fillRowData(4 * 11 + weaponIndex, dt[5], pc[5]);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        List<List<Object[]>> allGroups = Arrays.asList(groupTotal, groupCY, groupTY, groupSau, groupCL);
-        String[] groupNames = {"dBB1+PT", "Hướng PN chủ yếu", "Hướng PN thứ yếu", "Hướng PN phía sau", "Lực lượng còn lại"};
-
-        for (int i = 0; i < allGroups.size(); i++) {
-            List<Object[]> group = allGroups.get(i);
-            if (!group.isEmpty()) {
-                for (int j = 0; j < group.size(); j++) {
-                    Object[] row = group.get(j);
-                    if (j == 0) row[0] = groupNames[i]; // Gán tên nhóm ở dòng đầu để tạo hiệu ứng Rowspan
-                    model.addRow(row);
-                }
-            }
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
-    private double[] parseArray(String[] arr) {
-        double[] res = new double[6];
-        for (int i = 0; i < 6; i++) {
-            if (i < arr.length) res[i] = InputValidator.parseDoubleSafe(arr[i]);
-        }
-        return res;
-    }
+    private void fillRowData(int row, double hienCo, double phaiCo) {
+        if (hienCo == 0 && phaiCo == 0) return;
 
-    private Object[] createRow(String donVi, String ten, String dvt, double hienCo, double phaiCo) {
+        String name = model.getValueAt(row, 1).toString().toLowerCase();
         String kb = "1,00";
         String kt = "1,00";
-        String tenLower = ten != null ? ten.toLowerCase() : "";
-
-        if (tenLower.contains("tiểu liên") || tenLower.contains("ak")) kt = "0,98";
-        else if (tenLower.contains("b41")) kt = "0,97";
+        if (name.contains("tiểu liên") || name.contains("ak")) kt = "0,98";
+        else if (name.contains("b41")) kt = "0,97";
 
         double boSung = phaiCo - hienCo;
         String slBoSung = (boSung > 0) ? formatDouble(boSung) : "";
@@ -235,11 +257,24 @@ public class Tab4_EquipmentPanel extends JPanel {
         String dd = (boSung > 0) ? "VTCH/đv" : "";
         String pt = (boSung > 0) ? "Tay ba" : "";
 
-        return new Object[]{
-                donVi, ten, dvt != null && !dvt.isEmpty() ? dvt : "Khẩu", "0",
-                formatDouble(hienCo), formatDouble(hienCo), kb, kt,
-                formatDouble(phaiCo), slBoSung, tg, dd, pt
-        };
+        // Nhu cầu (3) để trống, Hiện có tổng(4), Tốt(5), Kbđ(6), Kt(7), Phải có(8)
+        model.setValueAt(formatDouble(hienCo), row, 4);
+        model.setValueAt(formatDouble(hienCo), row, 5);
+        model.setValueAt(kb, row, 6);
+        model.setValueAt(kt, row, 7);
+        model.setValueAt(formatDouble(phaiCo), row, 8);
+
+        // Bổ sung: SL(9), TG(10), Địa điểm(11), Phương thức(12)
+        model.setValueAt(slBoSung, row, 9);
+        model.setValueAt(tg, row, 10);
+        model.setValueAt(dd, row, 11);
+        model.setValueAt(pt, row, 12);
+    }
+
+    private double[] parseArray(String[] arr) {
+        double[] res = new double[6];
+        for (int i = 0; i < 6; i++) if (i < arr.length) res[i] = InputValidator.parseDoubleSafe(arr[i]);
+        return res;
     }
 
     private String formatDouble(double d) {
@@ -248,140 +283,109 @@ public class Tab4_EquipmentPanel extends JPanel {
     }
 
     // =====================================================================
-    // UI RENDERERS - FIX LỆCH CỘT TUYỆT ĐỐI 100%
+    // UI RENDERERS VÀ HEADER
     // =====================================================================
     private void setupCustomRenderers() {
         Color gridColor = new Color(203, 213, 225);
 
-        DefaultTableCellRenderer groupRenderer = new DefaultTableCellRenderer() {
+        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                String text = value != null ? value.toString() : "";
 
-                setHorizontalAlignment(SwingConstants.CENTER);
-                setFont(new Font("Segoe UI", Font.BOLD, 14));
+                boolean isMerged = (column == 0) && (value == null || value.toString().isEmpty());
+                int topBorder = isMerged ? 0 : 1;
+                ((JComponent) c).setBorder(BorderFactory.createMatteBorder(topBorder, 0, 1, 1, gridColor));
 
-                boolean isLastRow = (row == table.getRowCount() - 1);
-                boolean nextRowHasText = !isLastRow && table.getValueAt(row + 1, 0) != null && !table.getValueAt(row + 1, 0).toString().isEmpty();
+                if (column <= 1) setHorizontalAlignment(SwingConstants.LEFT);
+                else setHorizontalAlignment(SwingConstants.CENTER);
 
-                int top = text.isEmpty() ? 0 : 1;
-                int bottom = (isLastRow || nextRowHasText) ? 1 : 0;
-
-                ((JComponent) c).setBorder(BorderFactory.createMatteBorder(top, 1, bottom, 1, gridColor));
-                c.setBackground(isSelected ? new Color(219, 234, 254) : Color.WHITE);
+                if (column == 0 && !isMerged) {
+                    setFont(new Font("Times New Roman", Font.BOLD, 15));
+                    c.setBackground(new Color(248, 250, 252));
+                } else {
+                    setFont(new Font("Times New Roman", Font.PLAIN, 14));
+                    if (isSelected && column > 0) c.setBackground(new Color(219, 234, 254));
+                    else c.setBackground(Color.WHITE);
+                }
+                c.setForeground(Color.BLACK);
                 return c;
             }
-        };
+        });
 
-        DefaultTableCellRenderer standardRenderer = new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                setHorizontalAlignment(column == 1 ? SwingConstants.LEFT : SwingConstants.CENTER);
-                setFont(new Font("Segoe UI", Font.PLAIN, 14));
-
-                ((JComponent) c).setBorder(BorderFactory.createMatteBorder(1, 0, 1, 1, gridColor));
-                c.setBackground(isSelected ? new Color(219, 234, 254) : Color.WHITE);
-                return c;
-            }
-        };
-
-        // BÍ QUYẾT CHỐNG LỆCH CỘT LÀ SET MAX WIDTH
         for (int i = 0; i < colWidths.length; i++) {
             table.getColumnModel().getColumn(i).setPreferredWidth(colWidths[i]);
             table.getColumnModel().getColumn(i).setMinWidth(colWidths[i]);
-            table.getColumnModel().getColumn(i).setMaxWidth(colWidths[i]); // <-- ÉP CỨNG WIDTH
-
-            if (i == 0) {
-                table.getColumnModel().getColumn(i).setCellRenderer(groupRenderer);
-            } else {
-                table.getColumnModel().getColumn(i).setCellRenderer(standardRenderer);
-            }
+            table.getColumnModel().getColumn(i).setMaxWidth(colWidths[i]);
         }
     }
 
     private JPanel createAbsoluteHeader() {
-        int totalWidth = 0;
-        for (int w : colWidths) totalWidth += w;
+        int totalWidth = 0; for (int w : colWidths) totalWidth += w;
+        JPanel p = new JPanel(null); p.setBackground(new Color(241, 245, 249)); p.setPreferredSize(new Dimension(totalWidth, 60));
+        int[] x = new int[colWidths.length + 1]; x[0] = 0; for (int i = 0; i < colWidths.length; i++) x[i + 1] = x[i] + colWidths[i];
 
-        JPanel p = new JPanel(null);
-        p.setBackground(new Color(241, 245, 249));
-        p.setPreferredSize(new Dimension(totalWidth, 60));
+        p.add(createHeaderLabel("Đơn vị", x[0], 0, colWidths[0], 60));
+        p.add(createHeaderLabel("Tên TBKT", x[1], 0, colWidths[1], 60));
+        p.add(createHeaderLabel("ĐVT", x[2], 0, colWidths[2], 60));
+        p.add(createHeaderLabel("Nhu cầu", x[3], 0, colWidths[3], 60));
 
-        int[] x = new int[colWidths.length + 1];
-        x[0] = 0;
-        for (int i = 0; i < colWidths.length; i++) {
-            x[i + 1] = x[i] + colWidths[i];
-        }
+        p.add(createHeaderLabel("Hiện có", x[4], 0, x[8] - x[4], 30));
+        p.add(createHeaderLabel("<html><center>Phải có<br>trước CĐ</center></html>", x[8], 0, colWidths[8], 60));
+        p.add(createHeaderLabel("Phải bổ sung", x[9], 0, x[13] - x[9], 30));
 
-        p.add(createHeaderLabel("Đơn vị", x[0], 0, colWidths[0], 60, true));
-        p.add(createHeaderLabel("Tên TBKT", x[1], 0, colWidths[1], 60, false));
-        p.add(createHeaderLabel("ĐVT", x[2], 0, colWidths[2], 60, false));
-        p.add(createHeaderLabel("Nhu cầu", x[3], 0, colWidths[3], 60, false));
+        p.add(createHeaderLabel("Tổng số", x[4], 30, colWidths[4], 30));
+        p.add(createHeaderLabel("Số tốt", x[5], 30, colWidths[5], 30));
+        p.add(createHeaderLabel("Kbđ", x[6], 30, colWidths[6], 30));
+        p.add(createHeaderLabel("Kt", x[7], 30, colWidths[7], 30));
 
-        p.add(createHeaderLabel("HIỆN CÓ", x[4], 0, x[8] - x[4], 30, false));
-        p.add(createHeaderLabel("<html><center>Phải có<br>trước CĐ</center></html>", x[8], 0, colWidths[8], 60, false));
-        p.add(createHeaderLabel("PHẢI BỔ SUNG", x[9], 0, x[12] - x[9], 30, false));
-
-        p.add(createHeaderLabel("Phương thức", x[12], 0, colWidths[12], 60, false));
-
-        p.add(createHeaderLabel("Tổng số", x[4], 30, colWidths[4], 30, false));
-        p.add(createHeaderLabel("Số tốt", x[5], 30, colWidths[5], 30, false));
-        p.add(createHeaderLabel("Kbđ", x[6], 30, colWidths[6], 30, false));
-        p.add(createHeaderLabel("Kt", x[7], 30, colWidths[7], 30, false));
-
-        p.add(createHeaderLabel("Số lượng", x[9], 30, colWidths[9], 30, false));
-        p.add(createHeaderLabel("Thời gian", x[10], 30, colWidths[10], 30, false));
-        p.add(createHeaderLabel("Địa điểm", x[11], 30, colWidths[11], 30, false));
+        p.add(createHeaderLabel("Số lượng", x[9], 30, colWidths[9], 30));
+        p.add(createHeaderLabel("Thời gian", x[10], 30, colWidths[10], 30));
+        p.add(createHeaderLabel("Địa điểm", x[11], 30, colWidths[11], 30));
+        p.add(createHeaderLabel("Phương thức", x[12], 30, colWidths[12], 30));
 
         return p;
     }
 
-    private JLabel createHeaderLabel(String text, int x, int y, int w, int h, boolean isFirstColumn) {
+    private JLabel createHeaderLabel(String text, int x, int y, int w, int h) {
         JLabel label = new JLabel(text, SwingConstants.CENTER);
         label.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        label.setOpaque(true);
-        label.setBackground(new Color(241, 245, 249));
-
-        int left = isFirstColumn ? 1 : 0;
-        label.setBorder(BorderFactory.createMatteBorder(1, left, 1, 1, new Color(203, 213, 225)));
-
+        label.setOpaque(true); label.setBackground(new Color(241, 245, 249));
+        label.setBorder(BorderFactory.createMatteBorder(1, 0, 1, 1, new Color(203, 213, 225)));
         label.setBounds(x, y, w, h);
         return label;
     }
 
-    private JPanel createMeasuresSection() {
-        JPanel pnl = new JPanel();
-        pnl.setLayout(new BoxLayout(pnl, BoxLayout.Y_AXIS));
-        pnl.setBackground(Color.WHITE);
-        pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        pnl.add(UIUtils.createSectionLabel("2. Biện pháp bảo đảm"));
-        pnl.add(Box.createVerticalStrut(10));
-
-        txtGiaiDoanChuanBi = UIUtils.createStandardTextArea();
-        pnl.add(UIUtils.createSubSectionLabel("* Giai đoạn chuẩn bị:"));
-        pnl.add(UIUtils.createTextAreaScroll(txtGiaiDoanChuanBi, 100));
-        pnl.add(Box.createVerticalStrut(15));
-
-        txtGiaiDoanChienDau = UIUtils.createStandardTextArea();
-        pnl.add(UIUtils.createSubSectionLabel("* Giai đoạn chiến đấu:"));
-        pnl.add(UIUtils.createTextAreaScroll(txtGiaiDoanChienDau, 100));
-        pnl.add(Box.createVerticalStrut(15));
-
-        txtSauChienDau = UIUtils.createStandardTextArea();
-        pnl.add(UIUtils.createSubSectionLabel("* Sau chiến đấu:"));
-        pnl.add(UIUtils.createTextAreaScroll(txtSauChienDau, 100));
-
-        return pnl;
-    }
-
+    // =========================================================================
+    // XUẤT TỪNG KEYWORD RA WORD
+    // =========================================================================
     public Map<String, String> getExportData() {
         Map<String, String> data = new HashMap<>();
-        data.put("<<bp_cb_tbkt>>", txtGiaiDoanChuanBi.getText().trim());
-        data.put("<<bp_cd_tbkt>>", txtGiaiDoanChienDau.getText().trim());
-        data.put("<<bp_scd_tbkt>>", txtSauChienDau.getText().trim());
+
+        // Loop xuất 55 dòng (i từ 0 đến 54)
+        for (int i = 0; i < 55; i++) {
+            int r = i + 1; // 1 -> 55
+            data.put("<<tbkt_nhu_cau_" + r + ">>", getVal(i, 3));
+            data.put("<<tbkt_hc_tong_" + r + ">>", getVal(i, 4));
+            data.put("<<tbkt_hc_tot_" + r + ">>", getVal(i, 5));
+            data.put("<<tbkt_kbd_" + r + ">>", getVal(i, 6));
+            data.put("<<tbkt_kt_" + r + ">>", getVal(i, 7));
+            data.put("<<tbkt_phai_co_" + r + ">>", getVal(i, 8));
+            data.put("<<tbkt_bs_sl_" + r + ">>", getVal(i, 9));
+            data.put("<<tbkt_bs_tg_" + r + ">>", getVal(i, 10));
+            data.put("<<tbkt_bs_dd_" + r + ">>", getVal(i, 11));
+            data.put("<<tbkt_bs_pt_" + r + ">>", getVal(i, 12));
+        }
+
+        data.put("<<tbkt_chuan_bi>>", txtChuanBi.getText().trim());
+        data.put("<<tbkt_chien_dau>>", txtChienDau.getText().trim());
+        data.put("<<tbkt_sau_chien_dau>>", txtSauChienDau.getText().trim());
+
         return data;
+    }
+
+    private String getVal(int row, int col) {
+        Object v = model.getValueAt(row, col);
+        return v == null ? "" : v.toString().trim();
     }
 }

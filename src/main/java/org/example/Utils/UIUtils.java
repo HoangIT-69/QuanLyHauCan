@@ -308,8 +308,8 @@ public class UIUtils {
 
         // Đảm bảo Border được tạo đúng
         txt.setBorder(BorderFactory.createCompoundBorder(
-                new javax.swing.border.LineBorder(new Color(203, 213, 225), 1),
-                new javax.swing.border.EmptyBorder(2, 5, 2, 5)
+                new LineBorder(new Color(203, 213, 225), 1),
+                new EmptyBorder(2, 5, 2, 5)
         ));
 
         return txt; // <<< BẮT BUỘC PHẢI CÓ DÒNG NÀY

@@ -67,6 +67,9 @@ public class SessionHistoryPanel extends JPanel {
         table.setShowVerticalLines(false);
         table.setIntercellSpacing(new Dimension(0, 0));
 
+        // Bật tính năng Sort cho bảng (Rất tiện lợi khi bảng có nhiều dữ liệu)
+        table.setAutoCreateRowSorter(true);
+
         // Format Header
         table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 15));
         table.getTableHeader().setBackground(new Color(241, 245, 249));
@@ -99,14 +102,20 @@ public class SessionHistoryPanel extends JPanel {
         scroll.getViewport().setBackground(Color.WHITE);
         add(scroll, BorderLayout.CENTER);
 
-        // --- 3. FOOTER (NÚT TIẾP TỤC) ---
-        JPanel pnlFooter = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        // --- 3. FOOTER (NÚT XÓA VÀ TIẾP TỤC) ---
+        JPanel pnlFooter = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         pnlFooter.setOpaque(false);
+
+        // Thêm nút Xóa
+        JButton btnDelete = UIUtils.createStyledButton("🗑 Xóa kế hoạch", new Color(231, 76, 60)); // Màu đỏ
+        btnDelete.setPreferredSize(new Dimension(180, 45));
+        btnDelete.addActionListener(e -> deleteSelectedSession());
 
         JButton btnContinue = UIUtils.createStyledButton("Tiếp tục kế hoạch đã chọn ➔", new Color(41, 128, 185));
         btnContinue.setPreferredSize(new Dimension(250, 45));
         btnContinue.addActionListener(e -> openSelectedSession());
 
+        pnlFooter.add(btnDelete);
         pnlFooter.add(btnContinue);
         add(pnlFooter, BorderLayout.SOUTH);
 
@@ -116,23 +125,42 @@ public class SessionHistoryPanel extends JPanel {
 
     private void loadSessionsFromDB() {
         model.setRowCount(0);
-        String sql = "SELECT id, ten_bai_tap, ngay_tao, trang_thai FROM sessions WHERE user_id = ? ORDER BY ngay_tao DESC";
 
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DBConnection.getConnection()) {
+            if (conn == null) return;
 
-            pstmt.setInt(1, currentUserId);
-            ResultSet rs = pstmt.executeQuery();
+            // 1. Tự động kiểm tra xem đang ở chế độ Offline (H2) hay Online (MySQL)
+            String dbProductName = conn.getMetaData().getDatabaseProductName();
+            boolean isOffline = dbProductName.equalsIgnoreCase("H2");
 
-            while (rs.next()) {
-                int id = rs.getInt("id");
-                String ten = rs.getString("ten_bai_tap");
-                String ngayTao = rs.getString("ngay_tao");
-                int trangThai = rs.getInt("trang_thai");
+            String sql;
+            // 2. Phân nhánh câu lệnh SQL tùy theo chế độ
+            if (isOffline) {
+                // Nếu OFFLINE: Lấy toàn bộ, không phân biệt user
+                sql = "SELECT id, ten_bai_tap, ngay_tao, trang_thai FROM sessions ORDER BY ngay_tao DESC";
+            } else {
+                // Nếu ONLINE: Lấy theo currentUserId
+                sql = "SELECT id, ten_bai_tap, ngay_tao, trang_thai FROM sessions WHERE user_id = ? ORDER BY ngay_tao DESC";
+            }
 
-                String strTrangThai = (trangThai == 1) ? "Đã hoàn thành" : "Đang soạn thảo";
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                // 3. Nếu là ONLINE thì mới truyền tham số user_id vào dấu '?'
+                if (!isOffline) {
+                    pstmt.setInt(1, currentUserId);
+                }
 
-                model.addRow(new Object[]{id, ten, ngayTao, strTrangThai});
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        int id = rs.getInt("id");
+                        String ten = rs.getString("ten_bai_tap");
+                        String ngayTao = rs.getString("ngay_tao");
+                        int trangThai = rs.getInt("trang_thai");
+
+                        String strTrangThai = (trangThai == 1) ? "Đã hoàn thành" : "Đang soạn thảo";
+
+                        model.addRow(new Object[]{id, ten, ngayTao, strTrangThai});
+                    }
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -140,18 +168,65 @@ public class SessionHistoryPanel extends JPanel {
         }
     }
 
+    // ĐÃ FIX: SỬ DỤNG CONVERT ROW INDEX TO MODEL
     private void openSelectedSession() {
-        int row = table.getSelectedRow();
-        if (row == -1) {
+        int viewRow = table.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Vui lòng chọn một kế hoạch trong danh sách để tiếp tục!", "Thông báo", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        int sessionId = (int) model.getValueAt(row, 0);
-        String sessionName = (String) model.getValueAt(row, 1);
+        // Chuyển đổi Index từ Giao diện về Index của Dữ liệu thực tế
+        int modelRow = table.convertRowIndexToModel(viewRow);
+
+        int sessionId = (int) model.getValueAt(modelRow, 0);
+        String sessionName = (String) model.getValueAt(modelRow, 1);
 
         if (listener != null) {
             listener.onContinueSession(sessionId, sessionName);
+        }
+    }
+
+    // ĐÃ FIX: SỬ DỤNG CONVERT ROW INDEX TO MODEL
+    private void deleteSelectedSession() {
+        int viewRow = table.getSelectedRow();
+        if (viewRow == -1) {
+            JOptionPane.showMessageDialog(this, "Vui lòng chọn một kế hoạch trong danh sách để xóa!", "Thông báo", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Chuyển đổi Index từ Giao diện về Index của Dữ liệu thực tế
+        int modelRow = table.convertRowIndexToModel(viewRow);
+
+        int sessionId = (int) model.getValueAt(modelRow, 0);
+        String sessionName = (String) model.getValueAt(modelRow, 1);
+
+        // Cửa sổ xác nhận
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Bạn có chắc chắn muốn xóa kế hoạch: [" + sessionName + "] không?\nToàn bộ dữ liệu của kế hoạch này sẽ bị xóa vĩnh viễn!",
+                "Xác nhận xóa",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            String sql = "DELETE FROM sessions WHERE id = ?";
+            try (Connection conn = DBConnection.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+                pstmt.setInt(1, sessionId);
+                int affectedRows = pstmt.executeUpdate();
+
+                if (affectedRows > 0) {
+                    JOptionPane.showMessageDialog(this, "Đã xóa kế hoạch thành công!", "Thành công", JOptionPane.INFORMATION_MESSAGE);
+                    loadSessionsFromDB(); // Tải lại bảng để cập nhật giao diện
+                } else {
+                    JOptionPane.showMessageDialog(this, "Không tìm thấy kế hoạch để xóa!", "Lỗi", JOptionPane.ERROR_MESSAGE);
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Lỗi khi xóa kế hoạch: " + e.getMessage(), "Lỗi SQL", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 

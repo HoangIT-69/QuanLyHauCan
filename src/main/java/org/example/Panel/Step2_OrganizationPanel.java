@@ -111,7 +111,7 @@ public class Step2_OrganizationPanel extends JPanel {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 String huong = rs.getString("huong");
-                UnitDataEntryDialog.unitDataStore.put(huong, new java.util.Vector<>());
+                UnitDataEntryDialog.unitDataStore.put(huong, new Vector<>());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -197,62 +197,85 @@ public class Step2_OrganizationPanel extends JPanel {
             return false;
         }
 
+        // CHỐT AN TOÀN 1: Bắt chặn ngay nếu dữ liệu trên UI đang trống
+        // Tránh tình trạng lỡ gọi hàm save() khi chưa mở Dialog làm mất sạch dữ liệu DB
+        if (UnitDataEntryDialog.unitDataStore == null || UnitDataEntryDialog.unitDataStore.isEmpty()) {
+            System.out.println("Cảnh báo: Dữ liệu unitDataStore đang trống. Bỏ qua lệnh Lưu để bảo toàn Database.");
+            return true; // Trả về true để app cứ chạy tiếp bình thường mà không xóa DB
+        }
+
         try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
 
-            try (PreparedStatement del = conn.prepareStatement("DELETE FROM step2_bien_che WHERE session_id = ?")) {
-                del.setInt(1, sid);
-                del.executeUpdate();
-            }
+            try {
+                // 1. XÓA DỮ LIỆU CŨ
+                try (PreparedStatement del = conn.prepareStatement("DELETE FROM step2_bien_che WHERE session_id = ?")) {
+                    del.setInt(1, sid);
+                    del.executeUpdate();
+                }
 
-            // Đã cập nhật phan_loai vào SQL
-            String sql = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, (SELECT id FROM quyuoc_bienche WHERE CONCAT('[', nhom_don_vi, '] ', ten_don_vi) = ? LIMIT 1), ?)";
-            String sqlFallback = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, 1, 1)";
+                // 2. THÊM DỮ LIỆU MỚI
+                String sql = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, (SELECT id FROM quyuoc_bienche WHERE CONCAT('[', nhom_don_vi, '] ', ten_don_vi) = ? LIMIT 1), ?)";
+                String sqlFallback = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, 1, 1)";
 
-            try (PreparedStatement ins = conn.prepareStatement(sql);
-                 PreparedStatement insFallback = conn.prepareStatement(sqlFallback)) {
+                try (PreparedStatement ins = conn.prepareStatement(sql);
+                     PreparedStatement insFallback = conn.prepareStatement(sqlFallback)) {
 
-                for (String huong : UnitDataEntryDialog.unitDataStore.keySet()) {
-                    if (huong.equals("Tiểu đoàn") || huong.equals("Phối thuộc")) continue;
+                    for (String huong : UnitDataEntryDialog.unitDataStore.keySet()) {
+                        if (huong.equals("Tiểu đoàn") || huong.equals("Phối thuộc")) continue;
 
-                    Vector<Vector<Object>> rows = UnitDataEntryDialog.unitDataStore.get(huong);
-                    boolean hasUnits = false;
+                        Vector<Vector<Object>> rows = UnitDataEntryDialog.unitDataStore.get(huong);
+                        boolean hasUnits = false;
 
-                    if (rows != null && !rows.isEmpty()) {
-                        int currentLoai = 1; // 1 = Biên chế, 2 = Tăng cường
-                        for (Vector<Object> row : rows) {
-                            if (row.isEmpty() || row.get(0) == null) continue;
-                            String rawName = row.get(0).toString();
+                        if (rows != null && !rows.isEmpty()) {
+                            int currentLoai = 1; // 1 = Biên chế, 2 = Tăng cường
+                            for (Vector<Object> row : rows) {
+                                if (row.isEmpty() || row.get(0) == null) continue;
+                                String rawName = row.get(0).toString();
 
-                            // Tự động phân loại dựa trên dòng đang duyệt
-                            if (rawName.startsWith("1.")) { currentLoai = 1; continue; }
-                            if (rawName.startsWith("2.")) { currentLoai = 2; continue; }
-                            if (rawName.equals("TỔNG CỘNG")) continue;
+                                // Tự động phân loại dựa trên dòng đang duyệt
+                                if (rawName.startsWith("1.")) { currentLoai = 1; continue; }
+                                if (rawName.startsWith("2.")) { currentLoai = 2; continue; }
+                                if (rawName.equals("TỔNG CỘNG")) continue;
 
-                            String name = rawName.replace("  + ", "").trim();
+                                String name = rawName.replace("  + ", "").trim();
 
-                            if (name.startsWith("[") && name.contains("]")) {
-                                ins.setInt(1, sid);
-                                ins.setString(2, huong);
-                                ins.setString(3, name);
-                                ins.setInt(4, currentLoai); // Lưu 1 hoặc 2
-                                ins.addBatch();
-                                hasUnits = true;
+                                if (name.startsWith("[") && name.contains("]")) {
+                                    ins.setInt(1, sid);
+                                    ins.setString(2, huong);
+                                    ins.setString(3, name);
+                                    ins.setInt(4, currentLoai); // Lưu 1 hoặc 2
+                                    ins.addBatch();
+                                    hasUnits = true;
+                                }
                             }
+                        }
+
+                        // Nếu hướng này không có đơn vị nào hợp lệ, nhét 1 dòng rác (fallback) vào để giữ chỗ cho hướng
+                        if (!hasUnits) {
+                            insFallback.setInt(1, sid);
+                            insFallback.setString(2, huong);
+                            insFallback.addBatch();
                         }
                     }
 
-                    if (!hasUnits) {
-                        insFallback.setInt(1, sid);
-                        insFallback.setString(2, huong);
-                        insFallback.addBatch();
-                    }
+                    // Thực thi các lệnh thêm
+                    ins.executeBatch();
+                    insFallback.executeBatch();
                 }
-                ins.executeBatch();
-                insFallback.executeBatch();
+
+                // CHỐT AN TOÀN 2: Lưu thành công trọn vẹn mới commit
+                conn.commit();
+                return true;
+
+            } catch (Exception ex) {
+                // NẾU CÓ LỖI XẢY RA Ở ĐOẠN INSERT -> LẬP TỨC ROLLBACK LẠI LỆNH DELETE BAN ĐẦU
+                conn.rollback();
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Có lỗi xảy ra khi lưu biên chế. Dữ liệu cũ đã được khôi phục!", "Lỗi", JOptionPane.ERROR_MESSAGE);
+                return false;
             }
-            conn.commit();
-            return true;
+
         } catch (Exception e) {
             e.printStackTrace();
             return false;

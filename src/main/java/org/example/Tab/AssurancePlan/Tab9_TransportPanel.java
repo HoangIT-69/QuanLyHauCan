@@ -1,6 +1,5 @@
 package org.example.Tab.AssurancePlan;
 
-import org.example.Utils.InputValidator;
 import org.example.Utils.UIUtils;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -20,6 +19,7 @@ public class Tab9_TransportPanel extends JPanel {
     // Màu sắc hiện đại
     private static final Color SLATE_TEXT = new Color(30, 41, 59);
     private static final Color SLATE_BORDER = new Color(203, 213, 225);
+    private static final Color ROW_GRAY = new Color(241, 245, 249); // Màu xám cho các dòng Tổng/Cha
 
     public Tab9_TransportPanel() {
         setLayout(new BorderLayout());
@@ -44,14 +44,14 @@ public class Tab9_TransportPanel extends JPanel {
         mainContainer.add(createTextAreaScrollWithBorder(txtDuongVanTai, 100));
         mainContainer.add(Box.createVerticalStrut(25));
 
-        // 2. Dự tính khối lượng (BẢNG 2 TẦNG)
-        mainContainer.add(UIUtils.createSectionLabel("2. Dự tính khối lượng vận tải"));
+        // 2. Dự tính khối lượng (BẢNG 1)
+        mainContainer.add(UIUtils.createSectionLabel("2. Khối lượng vận tải và phân cấp vận chuyển"));
         mainContainer.add(Box.createVerticalStrut(15));
         mainContainer.add(createKhoiLuongTable());
-        mainContainer.add(Box.createVerticalStrut(25));
+        mainContainer.add(Box.createVerticalStrut(35));
 
-        // 3. Kế hoạch (BẢNG THƯỜNG)
-        mainContainer.add(UIUtils.createSectionLabel("3. Kế hoạch vận chuyển chi tiết"));
+        // 3. Kế hoạch (BẢNG 2)
+        mainContainer.add(UIUtils.createSectionLabel("3. Kế hoạch vận chuyển do hậu cần, kỹ thuật tiểu đoàn đảm nhiệm"));
         mainContainer.add(Box.createVerticalStrut(15));
         mainContainer.add(createKeHoachTable());
 
@@ -67,7 +67,7 @@ public class Tab9_TransportPanel extends JPanel {
         area.setForeground(SLATE_TEXT);
         area.setLineWrap(true);
         area.setWrapStyleWord(true);
-        area.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10)); // Padding
+        area.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         return area;
     }
 
@@ -77,189 +77,278 @@ public class Tab9_TransportPanel extends JPanel {
         scroll.setPreferredSize(new Dimension(800, preferredHeight));
         scroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, preferredHeight));
         scroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        UIUtils.makeScrollPassThrough(scroll);
         return scroll;
     }
 
-    // --- BẢNG 1: DỰ TÍNH KHỐI LƯỢNG (HEADER 2 TẦNG) ---
+    // =========================================================================
+    // BẢNG 1: DỰ TÍNH KHỐI LƯỢNG VẬN TẢI (14 Cột, Header 3 tầng)
+    // =========================================================================
     private JPanel createKhoiLuongTable() {
-        JPanel pnl = new JPanel(new BorderLayout(0, 10)); // Gap 10px
+        JPanel pnl = new JPanel(new BorderLayout(0, 0));
         pnl.setOpaque(false);
-        pnl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 320)); // Cao hơn cho header 2 tầng
+        pnl.setMaximumSize(new Dimension(1100, 450));
         pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Chiều rộng các cột
-        int[] w = {50, 250, 100, 100, 100, 100, 150};
-        String[] cols = new String[7]; for (int i=0; i<7; i++) cols[i] = ""; // Header trống vì dùng label tuyệt đối
+        int[] w = {40, 180, 50, 50, 50, 50, 50, 50, 50, 50, 80, 80, 60, 100};
+        String[] cols = new String[14]; for (int i=0; i<14; i++) cols[i] = "";
 
-        modelKhoiLuong = new DefaultTableModel(cols, 0);
-        for(int i=0; i<4; i++) modelKhoiLuong.addRow(new Object[]{"", "", "", "", "", "", ""});
-
-        JTable table = new JTable(modelKhoiLuong);
-        table.setRowHeight(35);
-        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        table.setTableHeader(null); // Không dùng header chuẩn
-        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-
-        // Custom Table Renderer (Viền và Canh lề Số/Chữ)
-        Color gridColor = new Color(226, 232, 240);
-        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer() {
+        modelKhoiLuong = new DefaultTableModel(cols, 0) {
             @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                ((JComponent) c).setBorder(BorderFactory.createMatteBorder(0, 0, 1, column == 6 ? 0 : 1, gridColor));
-
-                // Canh lề: Nội dung canh trái, Số canh giữa
-                if (column == 1) setHorizontalAlignment(SwingConstants.LEFT);
-                else setHorizontalAlignment(SwingConstants.CENTER);
-
-                if (column == 0) setFont(new Font("Segoe UI", Font.BOLD, 14)); // TT in đậm
-                else setFont(new Font("Segoe UI", Font.PLAIN, 14));
-
-                if (isSelected) c.setBackground(new Color(219, 234, 254));
-                else c.setBackground(Color.WHITE);
-                return c;
+            public boolean isCellEditable(int row, int column) {
+                // Khóa cột TT và Nội dung, chỉ cho phép điền số liệu
+                if (column <= 1) return false;
+                String nd = getValueAt(row, 1).toString();
+                return !nd.startsWith("Toàn trận") && !nd.startsWith("Giai đoạn") && !nd.startsWith("Đơn vị tính");
             }
         };
+
+        // --- ADD DỮ LIỆU CỨNG (ĐÃ SỬA THEO ẢNH 2) ---
+        modelKhoiLuong.addRow(new Object[]{"", "Đơn vị tính", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Người", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "Toàn trận", "", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "Giai đoạn chuẩn bị", "", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "  - Trên chuyển", "", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "  - Cấp mình", "", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "  - Dưới chuyển", "", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "Giai đoạn chiến đấu", "", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "  - Trên chuyển", "", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "  - Cấp mình", "", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "  - Dưới chuyển", "", "", "", "", "", "", "", "", "", "", "", ""});
+
+        JTable table = new JTable(modelKhoiLuong);
+        table.setRowHeight(30);
+        table.setTableHeader(null);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        Color gridColor = new Color(226, 232, 240);
+        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object v, boolean isSel, boolean focus, int r, int c) {
+                Component comp = super.getTableCellRendererComponent(t, v, isSel, focus, r, c);
+                ((JComponent) comp).setBorder(BorderFactory.createMatteBorder(0, 0, 1, c == 13 ? 0 : 1, gridColor));
+
+                String nd = t.getValueAt(r, 1).toString();
+                if (c <= 1) setHorizontalAlignment(SwingConstants.LEFT);
+                else setHorizontalAlignment(SwingConstants.CENTER);
+
+                if (r == 0) { // Dòng Đơn vị tính
+                    setFont(new Font("Times New Roman", Font.ITALIC, 15));
+                    comp.setBackground(Color.WHITE);
+                    comp.setForeground(SLATE_TEXT);
+                } else if (nd.equals("Toàn trận") || nd.startsWith("Giai đoạn")) { // Dòng Cha to
+                    setFont(new Font("Times New Roman", Font.BOLD, 15));
+                    comp.setBackground(ROW_GRAY);
+                    comp.setForeground(Color.BLACK);
+                } else {
+                    setFont(new Font("Times New Roman", Font.PLAIN, 15));
+                    comp.setForeground(Color.BLACK);
+                    if (isSel && c > 1) comp.setBackground(new Color(219, 234, 254));
+                    else comp.setBackground(Color.WHITE);
+                }
+                return comp;
+            }
+        });
+
         for (int i = 0; i < w.length; i++) {
             table.getColumnModel().getColumn(i).setPreferredWidth(w[i]);
             table.getColumnModel().getColumn(i).setMinWidth(w[i]);
             table.getColumnModel().getColumn(i).setMaxWidth(w[i]);
-            table.getColumnModel().getColumn(i).setCellRenderer(renderer);
         }
 
-        // --- CUSTOME HEADER (Dùng Absolute Layout để hiện 2 tầng Tấn/Người) ---
         JPanel headerPanel = createHeaderKhoiLuong(w);
         JViewport viewport = new JViewport();
         viewport.setView(headerPanel);
         viewport.setPreferredSize(headerPanel.getPreferredSize());
 
         JScrollPane scroll = new JScrollPane(table);
-        scroll.setBorder(new LineBorder(SLATE_BORDER, 1));
-        // Đồng bộ Scrollbar ngang với Header
+        scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getHorizontalScrollBar().addAdjustmentListener(e -> viewport.setViewPosition(new Point(e.getValue(), 0)));
+        UIUtils.makeScrollPassThrough(scroll);
 
-        // Gộp header tuyệt đối vào trên Scrollpane bảng
         JPanel combined = new JPanel(new BorderLayout());
-        combined.setBorder(null); // Viền nằm ở ngoài cùng của PANEL to
+        combined.setBorder(new LineBorder(SLATE_BORDER, 1));
 
-        // Wrapper cho Header để đồng bộ
         JPanel headerWrapper = new JPanel(new BorderLayout());
         headerWrapper.add(viewport, BorderLayout.CENTER);
-
-        // Tạo khoảng trống cho Scrollbar dọc để Header không bị lệch
         int scrollWidth = UIManager.getInt("ScrollBar.width");
         if (scrollWidth == 0) scrollWidth = 17;
-        JPanel spacer = new JPanel(); spacer.setPreferredSize(new Dimension(scrollWidth, 60)); spacer.setBackground(new Color(241, 245, 249)); spacer.setBorder(BorderFactory.createMatteBorder(0,0,1,0,SLATE_BORDER));
+        JPanel spacer = new JPanel(); spacer.setPreferredSize(new Dimension(scrollWidth, 90)); spacer.setBackground(ROW_GRAY); spacer.setBorder(BorderFactory.createMatteBorder(0,0,1,0,SLATE_BORDER));
         headerWrapper.add(spacer, BorderLayout.EAST);
 
         combined.add(headerWrapper, BorderLayout.NORTH);
         combined.add(scroll, BorderLayout.CENTER);
-
-        // Thanh công cụ Nút
-        JPanel pnlBtn = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        pnlBtn.setOpaque(false);
-        pnlBtn.setAlignmentX(Component.RIGHT_ALIGNMENT);
-        JButton btnAdd = UIUtils.createStyledButton("➕ Thêm dòng", new Color(41, 128, 185));
-        JButton btnDel = UIUtils.createStyledButton("➖ Xóa dòng", new Color(231, 76, 60));
-        btnAdd.addActionListener(e -> modelKhoiLuong.addRow(new Object[]{"", "", "", "", "", "", ""}));
-        btnDel.addActionListener(e -> { int r = table.getSelectedRow(); if(r!=-1) modelKhoiLuong.removeRow(r); });
-        pnlBtn.add(btnAdd); pnlBtn.add(btnDel);
-
-        pnl.add(pnlBtn, BorderLayout.NORTH);
-        pnl.add(combined, BorderLayout.CENTER); // Viền chung
+        pnl.add(combined, BorderLayout.CENTER);
         return pnl;
     }
 
-    // HÀM TẠO HEADER TUYỆT ĐỐI (CỐ ĐỊNH 2 TẦNG)
     private JPanel createHeaderKhoiLuong(int[] w) {
-        JPanel p = new JPanel(null); // Absolute
-        p.setBackground(new Color(241, 245, 249)); // Slate-100 Header
-        int totalWidth = 0; for (int width : w) totalWidth += width;
-        p.setPreferredSize(new Dimension(totalWidth, 60)); // Cao 60px cho 2 tầng
+        JPanel p = new JPanel(null); p.setBackground(ROW_GRAY);
+        int totalWidth = 0; for (int width : w) totalWidth += width; p.setPreferredSize(new Dimension(totalWidth, 90));
+        int[] x = new int[15]; x[0]=0; for(int i=0; i<14; i++) x[i+1] = x[i]+w[i];
 
-        // Mảng x lưu vị trí ngang
-        int[] x = new int[8]; x[0]=0; for(int i=0; i<7; i++) x[i+1] = x[i]+w[i];
+        // L1
+        p.add(UIUtils.createAbsoluteHeaderLabel("TT", x[0], 0, w[0], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Nội dung", x[1], 0, w[1], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Khối lượng vận chuyển", x[2], 0, x[12]-x[2], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Người", x[12], 0, w[12], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Ghi chú", x[13], 0, w[13], 90));
 
-        // --- HÀNG 1 (Cao 30px) ---
-        p.add(UIUtils.createAbsoluteHeaderLabel("TT", x[0], 0, w[0], 60));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Nội dung", x[1], 0, w[1], 60));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Khối lượng", x[2], 0, w[2]+w[3], 30)); // header bao 2 ô con Tấn/Người
-        p.add(UIUtils.createAbsoluteHeaderLabel("Phương thức", x[4], 0, w[4]+w[5], 30)); // header bao Cơ giới/Thô sơ
-        p.add(UIUtils.createAbsoluteHeaderLabel("Ghi chú", x[6], 0, w[6], 60));
+        // L2
+        p.add(UIUtils.createAbsoluteHeaderLabel("Vũ khí trang bị kỹ thuật", x[2], 30, w[2]*4, 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Vật chất hậu cần", x[6], 30, w[6]*4, 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Vật chất<br>khác</center></html>", x[10], 30, w[10], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Cộng", x[11], 30, w[11], 60));
 
-        // --- HÀNG 2 (Cao 30px, bắt đầu từ y=30) ---
-        p.add(UIUtils.createAbsoluteHeaderLabel("Tấn", x[2], 30, w[2], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Người", x[3], 30, w[3], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Cơ giới", x[4], 30, w[4], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Thô sơ", x[5], 30, w[5], 30));
+        // L3
+        p.add(UIUtils.createAbsoluteHeaderLabel("VKTB", x[2], 60, w[2], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Đạn", x[3], 60, w[3], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("VTKT", x[4], 60, w[4], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("+", x[5], 60, w[5], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("QN", x[6], 60, w[6], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("QY", x[7], 60, w[7], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("DT", x[8], 60, w[8], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("+", x[9], 60, w[9], 30));
 
         return p;
     }
 
-    // --- BẢNG 3: KẾ HOẠCH VẬN TẢI CHI TIẾT (Header thường 1 tầng) ---
+    // =========================================================================
+    // BẢNG 2: KẾ HOẠCH CHI TIẾT (14 Cột, Merge Cột 1 & 2 Ảo)
+    // =========================================================================
     private JPanel createKeHoachTable() {
-        JPanel pnl = new JPanel(new BorderLayout(0, 10)); // Gap 10px
+        JPanel pnl = new JPanel(new BorderLayout(0, 0));
         pnl.setOpaque(false);
-        pnl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 280));
+        pnl.setMaximumSize(new Dimension(1100, 450));
         pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        String[] cols = {"TT", "Giai đoạn", "Nội dung vận chuyển", "Khối lượng", "Phương tiện", "Ghi chú"};
-        modelKeHoach = new DefaultTableModel(cols, 0);
-        for(int i=0; i<3; i++) modelKeHoach.addRow(new Object[]{"", "", "", "", "", ""});
+        int[] w = {120, 80, 60, 70, 70, 80, 80, 60, 70, 70, 70, 70, 70, 70};
+        String[] cols = new String[14]; for (int i=0; i<14; i++) cols[i] = "";
+
+        modelKeHoach = new DefaultTableModel(cols, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column > 3; // Chỉ cho phép nhập dữ liệu từ Cột Khối lượng trở đi
+            }
+        };
+
+        // --- ADD DỮ LIỆU CỨNG PHÂN NHÓM (ĐÃ SỬA CỘT TỔNG SỐ) ---
+        String[] groups = {"TỔNG SỐ", "Hướng CY", "Hướng TY", "LL phía sau", "LL còn lại"};
+        String[] items = {"QN", "QY", "DT", "VTKT", "Đạn"};
+
+        for (String g : groups) {
+            for (int p = 0; p < 2; p++) {
+                String phase = (p == 0) ? "GĐCB" : "GĐCĐ";
+                for (int i = 0; i < items.length; i++) {
+                    String col0 = (p == 0 && i == 0) ? g : ""; // Chỉ in Tên Nhóm ở dòng đầu tiên của Nhóm
+                    String col1 = (i == 0) ? phase : ""; // Chỉ in Tên Giai đoạn ở dòng đầu tiên của GĐ
+                    String col2 = (i == 0) ? "0" : ""; // Cột Người chỉ có ở dòng đầu
+                    String col3 = items[i];
+                    modelKeHoach.addRow(new Object[]{col0, col1, col2, col3, "", "", "", "", "", "", "", "", "", ""});
+                }
+            }
+        }
 
         JTable table = new JTable(modelKeHoach);
-        table.setRowHeight(35); // Dòng rộng rãi
-        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.setRowHeight(30);
+        table.setTableHeader(null);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 
-        // --- CUSTOM BẢNG THƯỜNG ---
-        setupModernTableStyle(table, cols.length);
+        // Custom Renderer: Tạo hiệu ứng Merge Cell Ảo
+        Color gridColor = new Color(226, 232, 240);
+        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object v, boolean isSel, boolean focus, int r, int c) {
+                Component comp = super.getTableCellRendererComponent(t, v, isSel, focus, r, c);
 
-        JPanel pnlBtn = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        pnlBtn.setOpaque(false);
-        pnlBtn.setAlignmentX(Component.RIGHT_ALIGNMENT);
-        JButton btnAdd = UIUtils.createStyledButton("➕ Thêm kế hoạch", new Color(41, 128, 185));
-        JButton btnDel = UIUtils.createStyledButton("➖ Xóa kế hoạch", new Color(231, 76, 60));
-        btnAdd.addActionListener(e -> modelKeHoach.addRow(new Object[]{"", "", "", "", "", ""}));
-        btnDel.addActionListener(e -> { int r = table.getSelectedRow(); if(r!=-1) modelKeHoach.removeRow(r); });
-        pnlBtn.add(btnAdd); pnlBtn.add(btnDel);
+                String valStr = v != null ? v.toString() : "";
 
-        pnl.add(pnlBtn, BorderLayout.NORTH);
+                // Nếu là 3 cột đầu và ô đang trống -> Ẩn viền trên để tạo cảm giác gộp ô (Merge Cell)
+                boolean isMerged = (c <= 2) && valStr.isEmpty() && r > 0;
+                int topBorder = isMerged ? 0 : 1;
+
+                ((JComponent) comp).setBorder(BorderFactory.createMatteBorder(topBorder, 0, 1, c == 13 ? 0 : 1, gridColor));
+
+                if (c <= 1) setHorizontalAlignment(SwingConstants.LEFT);
+                else setHorizontalAlignment(SwingConstants.CENTER);
+
+                // Tô nền xám nhạt và in đậm cho 2 cột đầu tiên để nhấn mạnh cấu trúc
+                if (c <= 1) {
+                    setFont(new Font("Times New Roman", Font.BOLD, 15));
+                    comp.setBackground(new Color(248, 250, 252));
+                    comp.setForeground(SLATE_TEXT);
+                } else {
+                    setFont(new Font("Times New Roman", Font.PLAIN, 15));
+                    comp.setForeground(Color.BLACK);
+                    if (isSel && c > 2) comp.setBackground(new Color(219, 234, 254));
+                    else comp.setBackground(Color.WHITE);
+                }
+                return comp;
+            }
+        });
+
+        for (int i = 0; i < w.length; i++) {
+            table.getColumnModel().getColumn(i).setPreferredWidth(w[i]);
+            table.getColumnModel().getColumn(i).setMinWidth(w[i]);
+            table.getColumnModel().getColumn(i).setMaxWidth(w[i]);
+        }
+
+        JPanel headerPanel = createKeHoachHeader(w);
+        JViewport viewport = new JViewport();
+        viewport.setView(headerPanel);
+        viewport.setPreferredSize(headerPanel.getPreferredSize());
 
         JScrollPane scroll = new JScrollPane(table);
-        scroll.setBorder(new LineBorder(SLATE_BORDER, 1));
-        pnl.add(scroll, BorderLayout.CENTER);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getHorizontalScrollBar().addAdjustmentListener(e -> viewport.setViewPosition(new Point(e.getValue(), 0)));
+        UIUtils.makeScrollPassThrough(scroll);
+
+        JPanel combined = new JPanel(new BorderLayout());
+        combined.setBorder(new LineBorder(SLATE_BORDER, 1));
+
+        JPanel headerWrapper = new JPanel(new BorderLayout());
+        headerWrapper.add(viewport, BorderLayout.CENTER);
+        int scrollWidth = UIManager.getInt("ScrollBar.width");
+        if (scrollWidth == 0) scrollWidth = 17;
+        JPanel spacer = new JPanel(); spacer.setPreferredSize(new Dimension(scrollWidth, 90)); spacer.setBackground(ROW_GRAY); spacer.setBorder(BorderFactory.createMatteBorder(0,0,1,0,SLATE_BORDER));
+        headerWrapper.add(spacer, BorderLayout.EAST);
+
+        combined.add(headerWrapper, BorderLayout.NORTH);
+        combined.add(scroll, BorderLayout.CENTER);
+        pnl.add(combined, BorderLayout.CENTER);
         return pnl;
     }
 
-    private void setupModernTableStyle(JTable table, int columnCount) {
-        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
-        table.getTableHeader().setForeground(SLATE_TEXT);
-        table.getTableHeader().setBackground(new Color(241, 245, 249)); // Slate-100 Header
-        table.getTableHeader().setBorder(new LineBorder(SLATE_BORDER, 1));
+    private JPanel createKeHoachHeader(int[] w) {
+        JPanel p = new JPanel(null); p.setBackground(ROW_GRAY);
+        int totalWidth = 0; for (int width : w) totalWidth += width; p.setPreferredSize(new Dimension(totalWidth, 90));
+        int[] x = new int[15]; x[0]=0; for(int i=0; i<14; i++) x[i+1] = x[i]+w[i];
 
-        Color gridColor = new Color(226, 232, 240);
-        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                ((JComponent) c).setBorder(BorderFactory.createMatteBorder(0, 0, 1, column == columnCount - 1 ? 0 : 1, gridColor));
+        // L1
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Nội dung, Đơn vị<br>được vận chuyển</center></html>", x[0], 0, w[0]+w[1], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Người", x[2], 0, w[2], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("TBKT, vật chất HC, KT", x[3], 0, w[3]+w[4], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Địa điểm", x[5], 0, w[5]+w[6], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Cự ly<br>(km)</center></html>", x[7], 0, w[7], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Vận chuyển thô sơ", x[8], 0, w[8]+w[9]+w[10], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Vận chuyển khác", x[11], 0, w[11]+w[12]+w[13], 30));
 
-                // Canh trái cho ô thứ 2+3, canh giữa cho ô khác
-                if (column == 1 || column == 2) setHorizontalAlignment(SwingConstants.LEFT);
-                else setHorizontalAlignment(SwingConstants.CENTER);
+        // L2
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Chủng<br>loại</center></html>", x[3], 30, w[3], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Khối<br>lượng (tấn)</center></html>", x[4], 30, w[4], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Nơi nhận", x[5], 30, w[5], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Nơi giao", x[6], 30, w[6], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>vật chất<br>(tấn)</center></html>", x[8], 30, w[8], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Thời gian", x[9], 30, w[9]+w[10], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>vật chất<br>(tấn)</center></html>", x[11], 30, w[11], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Thời gian", x[12], 30, w[12]+w[13], 30));
 
-                if (column == 0) setFont(new Font("Segoe UI", Font.BOLD, 14)); // TT in đậm
-                else setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        // L3
+        p.add(UIUtils.createAbsoluteHeaderLabel("Bắt đầu", x[9], 60, w[9], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Kết thúc", x[10], 60, w[10], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Bắt đầu", x[12], 60, w[12], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Kết thúc", x[13], 60, w[13], 30));
 
-                if (isSelected) c.setBackground(new Color(219, 234, 254));
-                else c.setBackground(Color.WHITE);
-                return c;
-            }
-        };
-        for (int i = 0; i < columnCount; i++) {
-            table.getColumnModel().getColumn(i).setCellRenderer(renderer);
-            if (i == 0) table.getColumnModel().getColumn(i).setMaxWidth(40);
-        }
+        return p;
     }
 
     public Map<String, String> getExportData() {
@@ -277,7 +366,15 @@ public class Tab9_TransportPanel extends JPanel {
             sb.append("<tr>");
             for (int j = 0; j < m.getColumnCount(); j++) {
                 Object val = m.getValueAt(i, j);
-                sb.append("<td>").append(val == null ? "" : val.toString().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")).append("</td>");
+                String text = val == null ? "" : val.toString().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+
+                // Tô đậm các dòng tổng / tiêu đề khi xuất Word
+                if (text.startsWith("Toàn trận") || text.startsWith("Giai đoạn") || text.startsWith("TỔNG") || text.startsWith("Hướng") || text.startsWith("LL")) {
+                    if (j <= 1) text = "<b>" + text + "</b>";
+                }
+
+                if (j <= 1) sb.append("<td class='text-left'>").append(text).append("</td>");
+                else sb.append("<td>").append(text).append("</td>");
             }
             sb.append("</tr>");
         }

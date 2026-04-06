@@ -10,12 +10,13 @@ import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.List;
+import java.util.ArrayList;
 
 public class Tab5_VatChatPanel extends JPanel {
 
@@ -198,32 +199,205 @@ public class Tab5_VatChatPanel extends JPanel {
         return p;
     }
 
+    class ItemData {
+        String ten, dvt, danhMuc;
+        double quyUoc, wQddt, wTtGdcb, wTtGdcd, wPcScd, wPcTqd, wHcKhoD, wHcDonVi, wHcPhoiThuoc;
+        boolean isPercent, isDauThap, isTYS, isTYT, isTCT, ptCannotHold;
+    }
+
     public void loadDataFromDatabase(int sessionId) {
         vatChatModel.setRowCount(0);
-        String sqlData = "SELECT * FROM step4_quy_dinh_du_tru WHERE session_id = ? AND loai_vat_chat = ? ORDER BY id ASC";
-        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sqlData)) {
+
+        // =====================================================================
+        // BƯỚC 1: LẤY QUÂN SỐ CỦA TỪNG HƯỚNG VÀ TÍNH TỔNG (Toàn d)
+        // =====================================================================
+        Map<String, Integer> qsHuongD = new LinkedHashMap<>();
+        Map<String, Integer> qsHuongPT = new LinkedHashMap<>();
+        int qsToanD_d = 0, qsToanD_PT = 0;
+
+        String sqlQS = "SELECT s2.huong, s2.phan_loai, SUM(q.quan_so) as tong_qs " +
+                "FROM step2_bien_che s2 JOIN quyuoc_bienche q ON s2.quyuoc_id = q.id " +
+                "WHERE s2.session_id = ? GROUP BY s2.huong, s2.phan_loai ORDER BY s2.id ASC";
+
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sqlQS)) {
             ps.setInt(1, sessionId);
-            ps.setInt(2, this.type);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                String ten = rs.getString("vat_chat").trim();
-                String dvt = rs.getString("dvt") != null ? rs.getString("dvt") : "";
+            ResultSet rsQs = ps.executeQuery();
+            while (rsQs.next()) {
+                String huong = rsQs.getString("huong").trim();
+                int phanLoai = rsQs.getInt("phan_loai");
+                int qs = rsQs.getInt("tong_qs");
 
-                Object[] row = new Object[27];
-                Arrays.fill(row, "");
-                row[0] = ten;
-                row[1] = dvt;
-
-                // Điền tạm các số liệu cơ bản từ Step 4 vào đúng cột (QĐDT, GĐCB, GĐCĐ, Tổng SCD)
-                row[5] = f(rs.getDouble("du_tru"));
-                row[6] = f(rs.getDouble("tieu_thu_gdcb"));
-                row[7] = f(rs.getDouble("tieu_thu_gdcd"));
-                row[10] = f(rs.getDouble("phai_co_scd")); // Hiện tại để tổng vào cột +
-
-                vatChatModel.addRow(row);
+                if (phanLoai == 1) {
+                    qsHuongD.put(huong, qsHuongD.getOrDefault(huong, 0) + qs);
+                    qsToanD_d += qs;
+                } else if (phanLoai == 2) {
+                    qsHuongPT.put(huong, qsHuongPT.getOrDefault(huong, 0) + qs);
+                    qsToanD_PT += qs;
+                }
             }
         } catch (Exception e) { e.printStackTrace(); }
+
+
+        // =====================================================================
+        // BƯỚC 2: LẤY VÀ PHÂN LOẠI VẬT CHẤT VÀO 4 NHÓM
+        // =====================================================================
+        List<ItemData> listQuanNhu = new ArrayList<>();
+        List<ItemData> listQuanY = new ArrayList<>();
+        List<ItemData> listDoanhTrai = new ArrayList<>();
+        List<ItemData> listVTKT = new ArrayList<>();
+
+        String sqlData = "SELECT s4.*, s3.kho_d as hc_kho_d, s3.don_vi as hc_don_vi, s3.phoi_thuoc as hc_phoi_thuoc, qv.quy_uoc, qv.danh_muc " +
+                "FROM step4_quy_dinh_du_tru s4 " +
+                "LEFT JOIN step3_vat_chat s3 ON s4.session_id = s3.session_id AND s4.vat_chat = s3.vat_chat " +
+                "LEFT JOIN quyuoc_vchc qv ON s4.vat_chat = qv.ten_vat_chat " +
+                "WHERE s4.session_id = ? ORDER BY s4.id ASC"; // Bỏ lọc type để lấy cả VTKT nếu có
+
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sqlData)) {
+            ps.setInt(1, sessionId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                ItemData item = new ItemData();
+                item.ten = rs.getString("vat_chat").trim();
+                item.danhMuc = rs.getString("danh_muc") != null ? rs.getString("danh_muc").toLowerCase() : "";
+                item.dvt = rs.getString("dvt") != null ? rs.getString("dvt").trim() : "";
+                item.quyUoc = rs.getDouble("quy_uoc");
+                // Lấy các giá trị hệ số gốc (chưa nhân TLĐVT)
+                item.wQddt = rs.getDouble("du_tru");
+                item.wTtGdcb = rs.getDouble("tieu_thu_gdcb");
+                item.wTtGdcd = rs.getDouble("tieu_thu_gdcd");
+                item.wPcScd = rs.getDouble("phai_co_scd");
+                item.wPcTqd = rs.getDouble("phai_co_0400");
+                item.wHcKhoD = rs.getDouble("hc_kho_d");
+                item.wHcDonVi = rs.getDouble("hc_don_vi");
+                item.wHcPhoiThuoc = rs.getDouble("hc_phoi_thuoc");
+
+                item.isPercent = item.dvt.contains("%QS") || item.dvt.equals("%");
+                item.isDauThap = item.ten.equalsIgnoreCase("Dầu thắp");
+                item.isTYS = item.ten.equalsIgnoreCase("TYS") || item.ten.contains("Túi y sĩ");
+                item.isTYT = item.ten.equalsIgnoreCase("TYT") || item.ten.contains("Túi y tá");
+                item.isTCT = item.ten.equalsIgnoreCase("TCT") || item.ten.contains("Túi cứu thương");
+                item.ptCannotHold = item.isTYS || item.isTYT || item.isTCT || item.ten.contains("Đường sữa");
+
+                // Phân loại vào 4 List dựa vào cột danh_muc trong bảng quyuoc_vchc
+                if (item.danhMuc.contains("y")) listQuanY.add(item);
+                else if (item.danhMuc.contains("trại") || item.danhMuc.contains("dầu")) listDoanhTrai.add(item);
+                else if (item.danhMuc.contains("kỹ thuật") || rs.getInt("loai_vat_chat") == 3) listVTKT.add(item);
+                else listQuanNhu.add(item); // Mặc định là Quân nhu (Lương thực, thực phẩm)
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+
+
+        // =====================================================================
+        // BƯỚC 3: VẼ BẢNG THEO THỨ TỰ HƯỚNG -> DANH MỤC -> VẬT CHẤT
+        // =====================================================================
+        String[] laMa = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"};
+        List<String> listHuong = new ArrayList<>();
+        listHuong.add("Toàn d"); // Thêm Toàn d lên đầu tiên
+        for (String h : qsHuongD.keySet()) {
+            if (!h.equalsIgnoreCase("LL còn lại")) listHuong.add(h);
+        }
+        listHuong.add("LL còn lại"); // LLCL luôn nằm cuối
+
+        int huongIndex = 0;
+        for (String huongName : listHuong) {
+            // Xác định quân số và tính chất của Hướng hiện tại
+            int qsD = huongName.equals("Toàn d") ? qsToanD_d : qsHuongD.getOrDefault(huongName, 0);
+            int qsPT = huongName.equals("Toàn d") ? qsToanD_PT : qsHuongPT.getOrDefault(huongName, 0);
+
+            // XỬ LÝ NGOẠI LỆ: Các hướng thường KHÔNG có Kho và KHÔNG có Phối thuộc
+            boolean hasKho = huongName.equals("Toàn d") || huongName.equalsIgnoreCase("LL còn lại");
+            boolean hasPT = huongName.equals("Toàn d") || huongName.equalsIgnoreCase("LL còn lại");
+
+            // --- TẠO DÒNG TIÊU ĐỀ HƯỚNG (Vd: I. Toàn d) ---
+            int rowHuongIdx = vatChatModel.getRowCount();
+            Object[] rowHuong = new Object[27];
+            Arrays.fill(rowHuong, "");
+            rowHuong[0] = "<html><b>" + laMa[huongIndex++] + ". " + huongName + "</b></html>";
+            vatChatModel.addRow(rowHuong);
+            double[] tongHuong = new double[27];
+
+            // DUYỆT QUA 4 LOẠI DANH MỤC CỦA HƯỚNG ĐÓ
+            String[] catNames = {"1. Quân nhu", "2. Quân y", "3. Doanh trại", "4. VTKT"};
+            List<ItemData>[] catLists = new List[]{listQuanNhu, listQuanY, listDoanhTrai, listVTKT};
+
+            for (int c = 0; c < 4; c++) {
+                if (catLists[c].isEmpty()) continue;
+
+                // --- TẠO DÒNG TIÊU ĐỀ DANH MỤC (Vd: 1. Quân nhu) ---
+                int rowCatIdx = vatChatModel.getRowCount();
+                Object[] rowCat = new Object[27];
+                Arrays.fill(rowCat, "");
+                rowCat[0] = "<html><b>" + catNames[c] + "</b></html>";
+                rowCat[1] = "<html><b>Tấn</b></html>";
+                vatChatModel.addRow(rowCat);
+                double[] tongCat = new double[27];
+
+                // DUYỆT TỪNG VẬT CHẤT TRONG DANH MỤC
+                for (ItemData item : catLists[c]) {
+                    double tlDvtToanD = 0, tlDvtD = 0, tlDvtPT = 0;
+
+                    // Tính TL ĐVT
+                    if (item.isTYS) { tlDvtToanD = 6; tlDvtD = 6; tlDvtPT = 6; }
+                    else if (item.isTYT) { tlDvtToanD = 4; tlDvtD = 4; tlDvtPT = 4; }
+                    else if (item.isTCT) { tlDvtToanD = 2; tlDvtD = 2; tlDvtPT = 2; }
+                    else if (item.isDauThap) {
+                        tlDvtToanD = 0.5 * (qsToanD_d + qsToanD_PT) / 30.0;
+                        tlDvtD = 0.5 * qsD / 30.0;
+                        tlDvtPT = 0.5 * qsPT / 30.0;
+                    } else {
+                        double multi = item.isPercent ? 0.01 : 1.0;
+                        tlDvtToanD = item.quyUoc * (qsToanD_d + qsToanD_PT) * multi;
+                        tlDvtD = item.quyUoc * qsD * multi;
+                        tlDvtPT = item.quyUoc * qsPT * multi;
+                    }
+                    if (tlDvtToanD == 0) tlDvtToanD = 1; if (tlDvtD == 0) tlDvtD = 1; if (tlDvtPT == 0) tlDvtPT = 1;
+
+                    // Tính khối lượng thực tế (Dựa vào hasKho và hasPT)
+                    double wQddt = item.wQddt * tlDvtToanD;
+                    double wTtGdcb = item.wTtGdcb * tlDvtToanD;
+                    double wTtGdcd = item.wTtGdcd * tlDvtToanD;
+                    double wPcScd = item.wPcScd * tlDvtToanD;
+                    double wPcTqd = item.wPcTqd * tlDvtToanD;
+
+                    double wHcKhoD = hasKho ? (item.wHcKhoD * tlDvtToanD) : 0;
+                    double wHcDonVi = item.wHcDonVi * tlDvtD;
+                    double wHcPhoiThuoc = hasPT ? (item.wHcPhoiThuoc * tlDvtPT) : 0;
+
+                    // Tạo dòng
+                    Object[] row = new Object[27];
+                    Arrays.fill(row, "-"); // Dùng "-" làm mặc định cho các ô trống
+                    row[0] = item.ten;
+                    row[1] = item.dvt;
+                    if (huongName.equals("Toàn d")) {
+                        row[2] = f(tlDvtToanD); row[3] = f(tlDvtD); row[4] = f(tlDvtPT);
+                    } else {
+                        row[2] = ""; row[3] = ""; row[4] = ""; // Chỉ điền TL ĐVT ở Toàn d theo Excel
+                    }
+
+                    // Điền dữ liệu và cộng dồn vào mảng tổng (chia 1000 ra Tấn)
+                    // (Đoạn này bạn bê logic gán array và cộng dồn từ code trước vào)
+                    // Ví dụ:
+                    row[5] = f(wQddt); tongCat[5] += wQddt/1000;
+                    row[6] = f(wTtGdcb); tongCat[6] += wTtGdcb/1000;
+                    // ... (Tương tự cho các cột tính toán GĐCB, GĐCĐ) ...
+
+                    vatChatModel.addRow(row);
+                }
+
+                // --- CẬP NHẬT TỔNG VÀO DÒNG DANH MỤC TƯƠNG ỨNG ---
+                for(int col=5; col<=22; col++) {
+                    vatChatModel.setValueAt("<html><b>" + f(tongCat[col]) + "</b></html>", rowCatIdx, col);
+                    tongHuong[col] += tongCat[col]; // Cộng dồn lên tổng Hướng
+                }
+            }
+
+            // --- CẬP NHẬT TỔNG VÀO DÒNG HƯỚNG TƯƠNG ỨNG ---
+            for(int col=5; col<=22; col++) {
+                vatChatModel.setValueAt("<html><b>" + f(tongHuong[col]) + "</b></html>", rowHuongIdx, col);
+            }
+        }
     }
+
 
     private String f(double value) {
         if (value == 0) return "0";

@@ -1,0 +1,105 @@
+2026-04-01 16:32:52.538746+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "sessions" not found (this database is empty); SQL statement:
+SELECT id, ten_bai_tap, ngay_tao, trang_thai FROM sessions WHERE user_id = ? ORDER BY ngay_tao DESC [42104-224]
+2026-04-01 16:32:58.993023+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found (this database is empty); SQL statement:
+SELECT ma_quan_nhan, full_name, dob, rank, chuc_vu, don_vi FROM users WHERE username = ? [42104-224]
+2026-04-01 16:33:00.233502+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step1_thong_tin" not found (this database is empty); SQL statement:
+SELECT ten_van_kien FROM step1_thong_tin WHERE session_id = ? [42104-224]
+2026-04-01 16:33:00.498802+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step2_bien_che" not found (this database is empty); SQL statement:
+SELECT SUM(q.quan_so) AS tong_qs FROM step2_bien_che s2 JOIN quyuoc_bienche q ON s2.quyuoc_id = q.id WHERE s2.session_id = ? [42104-224]
+2026-04-01 16:33:00.635451+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step1_thong_tin" not found (this database is empty); SQL statement:
+SELECT chi_huy, nguoi_thay_the FROM step1_thong_tin WHERE session_id = ? [42104-224]
+2026-04-01 16:33:00.910631+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step4_quy_dinh_du_tru" not found (this database is empty); SQL statement:
+SELECT vat_chat, dvt, dt_chitiet, pc04_chitiet FROM step4_quy_dinh_du_tru WHERE session_id = ? [42104-224]
+2026-04-01 16:33:01.270636+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step2_bien_che" not found (this database is empty); SQL statement:
+SELECT s.huong, SUM(q.smpk_127mm) as smpk, SUM(q.co100mm) as c100, SUM(q.co82mm) as c82, SUM(q.co60mm) as c60, SUM(q.spg9) as spg9, SUM(q.b41) as b41, SUM(q.dai_lien) as dl, SUM(q.trung_lien) as trl, SUM(q.tieu_lien) as tl, SUM(q.sung_ngan) as sn, SUM(q.luu_dan) as ld FROM step2_bien_che s JOIN quyuoc_bienche q ON s.quyuoc_id = q.id WHERE s.session_id = ? GROUP BY s.huong [42104-224]
+2026-04-01 16:33:01.448632+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "quyuoc_dan" not found (this database is empty); SQL statement:
+SELECT loai_dan, trong_luong_1_vien, so_vien_tren_coso FROM quyuoc_dan [42104-224]
+2026-04-01 16:33:01.545631+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step4_quy_dinh_du_tru" not found (this database is empty); SQL statement:
+SELECT * FROM step4_quy_dinh_du_tru WHERE session_id = ? AND loai_vat_chat = 1 ORDER BY id ASC [42104-224]
+2026-04-01 16:33:01.665632+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step4_quy_dinh_du_tru" not found (this database is empty); SQL statement:
+SELECT * FROM step4_quy_dinh_du_tru WHERE session_id = ? AND loai_vat_chat = ? ORDER BY id ASC [42104-224]
+2026-04-01 16:33:01.764629+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step4_quy_dinh_du_tru" not found (this database is empty); SQL statement:
+SELECT * FROM step4_quy_dinh_du_tru WHERE session_id = ? AND loai_vat_chat = ? ORDER BY id ASC [42104-224]
+2026-04-01 16:33:01.949631+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step2_bien_che" not found (this database is empty); SQL statement:
+SELECT s.huong, SUM(q.quan_so) as total_qs FROM step2_bien_che s JOIN quyuoc_bienche q ON s.quyuoc_id = q.id WHERE s.session_id = ? GROUP BY s.huong [42104-224]
+2026-04-01 16:33:02.049631+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step4_ti_le_thuong_binh" not found (this database is empty); SQL statement:
+SELECT loai_thuong_binh, ti_le FROM step4_ti_le_thuong_binh WHERE session_id = ? [42104-224]
+2026-04-01 16:33:02.167631+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step4_hu_hong_vktb" not found (this database is empty); SQL statement:
+SELECT loai_vktb, so_luong_tham_gia, ti_le_hu_hong FROM step4_hu_hong_vktb WHERE session_id = ? ORDER BY id ASC [42104-224]
+2026-04-01 16:33:02.304631+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step1_thong_tin" not found (this database is empty); SQL statement:
+SELECT chi_huy, nguoi_thay_the FROM step1_thong_tin WHERE session_id = ? [42104-224]
+2026-04-01 16:33:02.675630+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step1_thong_tin" not found (this database is empty); SQL statement:
+SELECT ten_van_kien FROM step1_thong_tin WHERE session_id = ? [42104-224]
+2026-04-01 16:33:02.789629+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step2_bien_che" not found (this database is empty); SQL statement:
+SELECT SUM(q.quan_so) AS tong_qs FROM step2_bien_che s2 JOIN quyuoc_bienche q ON s2.quyuoc_id = q.id WHERE s2.session_id = ? [42104-224]
+2026-04-01 16:33:02.921097+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step1_thong_tin" not found (this database is empty); SQL statement:
+SELECT chi_huy, nguoi_thay_the FROM step1_thong_tin WHERE session_id = ? [42104-224]
+2026-04-01 16:33:03.109875+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found (this database is empty); SQL statement:
+SELECT id, username, password, ma_quan_nhan, full_name, dob, rank, chuc_vu, don_vi, role FROM users [42104-224]
+2026-04-01 16:33:03.256876+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "quyuoc_vchc" not found (this database is empty); SQL statement:
+SELECT * FROM quyuoc_vchc ORDER BY CASE danh_muc WHEN 'Quân lương' THEN 1 WHEN 'Quân trang' THEN 2 WHEN 'Quân y' THEN 3 WHEN 'Doanh trại' THEN 4 WHEN 'Khác' THEN 99 ELSE 5 END, ten_vat_chat [42104-224]
+2026-04-01 16:33:03.396054+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "quyuoc_dan" not found (this database is empty); SQL statement:
+SELECT * FROM quyuoc_dan ORDER BY CASE danh_muc WHEN 'Đạn phòng không' THEN 1 WHEN 'Đạn chống tăng' THEN 2 WHEN 'Đạn BB nhóm I' THEN 3 WHEN 'Đạn BB nhóm II' THEN 4 WHEN 'Mìn, Lựu đạn' THEN 99 ELSE 5 END, loai_dan [42104-224]
+2026-04-01 16:33:03.500053+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "quyuoc_bienche" not found (this database is empty); SQL statement:
+SELECT * FROM quyuoc_bienche ORDER BY CASE nhom_don_vi WHEN 'Tiểu đoàn' THEN 1 WHEN 'Trung đoàn' THEN 2 WHEN 'Sư đoàn' THEN 3 WHEN 'Khác' THEN 99 ELSE 4 END, ten_don_vi [42104-224]
+2026-04-01 16:33:09.629996+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step1_thong_tin" not found (this database is empty); SQL statement:
+SELECT ten_van_kien FROM step1_thong_tin WHERE session_id = ? [42104-224]
+2026-04-01 16:33:09.744994+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step2_bien_che" not found (this database is empty); SQL statement:
+SELECT SUM(q.quan_so) AS tong_qs FROM step2_bien_che s2 JOIN quyuoc_bienche q ON s2.quyuoc_id = q.id WHERE s2.session_id = ? [42104-224]
+2026-04-01 16:33:09.899618+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "step1_thong_tin" not found (this database is empty); SQL statement:
+SELECT chi_huy, nguoi_thay_the FROM step1_thong_tin WHERE session_id = ? [42104-224]
+2026-04-01 16:33:47.380379+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "sessions" not found (this database is empty); SQL statement:
+INSERT INTO sessions (user_id, ten_bai_tap, trang_thai) VALUES (?, ?, 0) [42104-224]
+2026-04-01 21:02:11.028642+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT id, role FROM users WHERE username = ? AND password = ? [42102-224]
+2026-04-01 21:02:20.920632+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT ma_quan_nhan, full_name, dob, rank, chuc_vu, don_vi FROM users WHERE username = ? [42102-224]
+2026-04-01 21:02:29.520712+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT id, username, password, ma_quan_nhan, full_name, dob, rank, chuc_vu, don_vi, role FROM users [42102-224]
+2026-04-01 21:05:39.773952+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT id, role FROM users WHERE username = ? AND password = ? [42102-224]
+2026-04-01 21:05:45.199379+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT ma_quan_nhan, full_name, dob, rank, chuc_vu, don_vi FROM users WHERE username = ? [42102-224]
+2026-04-01 21:05:51.085131+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT id, username, password, ma_quan_nhan, full_name, dob, rank, chuc_vu, don_vi, role FROM users [42102-224]
+2026-04-01 21:07:07.593455+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT id, role FROM users WHERE username = ? AND password = ? [42102-224]
+2026-04-01 21:07:12.478838+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT ma_quan_nhan, full_name, dob, rank, chuc_vu, don_vi FROM users WHERE username = ? [42102-224]
+2026-04-01 21:07:17.937501+07:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "users" not found; SQL statement:
+SELECT id, username, password, ma_quan_nhan, full_name, dob, rank, chuc_vu, don_vi, role FROM users [42102-224]

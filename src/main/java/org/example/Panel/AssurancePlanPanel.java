@@ -6,6 +6,7 @@ import org.example.Tab.PlanEstimation.Tab2_MissionPanel;
 import org.example.Tab.PlanEstimation.Tab6_LivingPanel;
 import org.example.Tab.PlanEstimation.Tab10_ProtectionPanel;
 import org.example.Tab.PlanEstimation.Tab11_CommandPanel;
+import org.example.Utils.DBConnection;
 import org.example.Utils.ExportWord;
 import org.example.Utils.UIUtils;
 
@@ -14,6 +15,9 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.io.InputStream;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,12 +30,17 @@ public class AssurancePlanPanel extends JPanel {
 
     private final String initialDanhGia;
     private final String initialNhiemVu;
-    // Thêm các biến chứa dữ liệu từ Plan Estimation
     private final Map<String, String> initialTab6Data;
     private final Map<String, String> initialTab10Data;
     private final Map<String, String> initialTab11Data;
 
     private final int sessionId;
+
+    // Đưa lblTitle lên thành biến toàn cục để dễ dàng đổi tên
+    private JLabel lblTitle;
+
+    // Map chứa dữ liệu chung (Tên văn kiện, Tọa độ, Bản đồ...) để ném vào Word
+    private Map<String, String> thongTinChungData = new HashMap<>();
 
     private Tab1_EvaluationPanel tab1;
     private Tab2_MissionPanel tab2;
@@ -45,7 +54,6 @@ public class AssurancePlanPanel extends JPanel {
     private Tab10_ProtectionPanel tab10;
     private Tab11_CommandPanel tab11;
 
-    // ĐÃ CẬP NHẬT CONSTRUCTOR ĐỂ NHẬN THÊM DATA TỪ TAB 6, 10, 11
     public AssurancePlanPanel(String initialDanhGia, String initialNhiemVu,
                               Map<String, String> initialTab6Data,
                               Map<String, String> initialTab10Data,
@@ -62,16 +70,54 @@ public class AssurancePlanPanel extends JPanel {
         setOpaque(false);
         setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        JLabel lblTitle = new JLabel("KẾ HOẠCH BẢO ĐẢM HẬU CẦN, KỸ THUẬT", SwingConstants.CENTER);
+        lblTitle = new JLabel("KẾ HOẠCH BẢO ĐẢM HẬU CẦN, KỸ THUẬT", SwingConstants.CENTER);
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
         lblTitle.setForeground(new Color(41, 128, 185));
         add(lblTitle, BorderLayout.NORTH);
+
+        // Kéo dữ liệu chung từ DB để đổi Tiêu đề và gom thông tin xuất Word
+        loadThongTinChung();
 
         initTabs();
         add(createFooterPanel(), BorderLayout.SOUTH);
 
         if (menuPanel.getComponentCount() > 0 && menuPanel.getComponent(0) instanceof JButton) {
             ((JButton) menuPanel.getComponent(0)).doClick();
+        }
+    }
+
+    // =========================================================================
+    // HÀM LẤY THÔNG TIN CHUNG TỪ DB ĐỂ HIỂN THỊ TIÊU ĐỀ & XUẤT WORD
+    // =========================================================================
+    private void loadThongTinChung() {
+        // Đổi tên bảng step1_ttchung thành tên đúng trong CSDL của bạn nếu khác
+        String sql = "SELECT * FROM step1_thong_tin WHERE session_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, sessionId);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                String tenVK = rs.getString("ten_van_kien");
+                if (tenVK != null && !tenVK.trim().isEmpty()) {
+                    // Đổi tên Tiêu đề Giao diện
+                    lblTitle.setText("KẾ HOẠCH BẢO ĐẢM HẬU CẦN, KỸ THUẬT " + tenVK.toUpperCase());
+                }
+
+                // Gắn dữ liệu vào Map Word với format {{...}} y hệt trong file mẫu DOCX
+                thongTinChungData.put("{{nguoi_phe_chuan}}", rs.getString("chi_huy"));
+                thongTinChungData.put("{{toa_do}}", "VTCH: " + rs.getString("vi_tri_chi_huy") + " " + rs.getString("thoi_gian"));
+                thongTinChungData.put("{{ban_do_su_dung}}", "Bản đồ tỷ lệ " + rs.getString("ty_le") + " BTTM in năm " + rs.getString("nam"));
+
+                // Nếu Word có cài đặt thẻ cho 4 mảnh bản đồ:
+                thongTinChungData.put("{{map_1}}", rs.getString("map_1"));
+                thongTinChungData.put("{{map_2}}", rs.getString("map_2"));
+                thongTinChungData.put("{{map_3}}", rs.getString("map_3"));
+                thongTinChungData.put("{{map_4}}", rs.getString("map_4"));
+            }
+        } catch (Exception e) {
+            System.err.println("Lỗi lấy thông tin chung: " + e.getMessage());
         }
     }
 
@@ -97,7 +143,6 @@ public class AssurancePlanPanel extends JPanel {
         tab5.loadSessionData(this.sessionId);
         addTab("V. Bảo đảm đạn, vật chất...", "tab5", tab5);
 
-        // NẠP DỮ LIỆU TỪ MAP VÀO TAB 6
         tab6 = new Tab6_LivingPanel();
         if (initialTab6Data != null) {
             tab6.setAnUong(initialTab6Data.getOrDefault("<<bd_an_uong>>", ""));
@@ -107,15 +152,16 @@ public class AssurancePlanPanel extends JPanel {
         addTab("VI. Bảo đảm đời sống", "tab6", tab6);
 
         tab7 = new Tab7_MedicalPanel();
+        tab7.loadDataFromDatabase(this.sessionId);
         addTab("VII. Bảo đảm quân y", "tab7", tab7);
 
         tab8 = new Tab8_MaintenancePanel();
+        tab8.loadDataFromDatabase(this.sessionId);
         addTab("VIII. Bảo dưỡng, sửa chữa", "tab8", tab8);
 
         tab9 = new Tab9_TransportPanel();
         addTab("IX. Công tác vận tải", "tab9", tab9);
 
-        // NẠP DỮ LIỆU TỪ MAP VÀO TAB 10
         tab10 = new Tab10_ProtectionPanel();
         if (initialTab10Data != null) {
             tab10.setTinhHuong(initialTab10Data.getOrDefault("<<tinh_huong_bv>>", ""));
@@ -123,7 +169,6 @@ public class AssurancePlanPanel extends JPanel {
         }
         addTab("X. Tổ chức bảo vệ", "tab10", tab10);
 
-        // NẠP DỮ LIỆU TỪ MAP VÀO TAB 11
         tab11 = new Tab11_CommandPanel(sessionId);
         if (initialTab11Data != null) {
             tab11.setTrienKhai(initialTab11Data.getOrDefault("<<trien_khai_ch>>", ""));
@@ -154,11 +199,11 @@ public class AssurancePlanPanel extends JPanel {
     private void performExport() {
         Map<String, String> dataMap = collectExportData();
 
-        InputStream templateStream = getClass().getResourceAsStream("/docs/word2.docx");
+        InputStream templateStream = getClass().getResourceAsStream("/docs/template-PN_BDKH.docx");
         if (templateStream == null) {
             JOptionPane.showMessageDialog(
                     this,
-                    "Không tìm thấy file mẫu tại src/main/resources/docs/word2.docx",
+                    "Không tìm thấy file mẫu tại src/main/resources/docs/template-PN_BDKH.docx",
                     "Lỗi Hệ Thống",
                     JOptionPane.ERROR_MESSAGE
             );
@@ -190,13 +235,16 @@ public class AssurancePlanPanel extends JPanel {
     private Map<String, String> collectExportData() {
         Map<String, String> dataMap = new HashMap<>();
 
-        dataMap.put("<<danh_gia_tinh_hinh>>", tab1.getDanhGia()); // FIX KEY THEO TAB 1 NẾU CẦN
-        dataMap.put("<<nhiem_vu>>", tab2.getNhiemVu());           // FIX KEY THEO TAB 2 NẾU CẦN
+        // 1. CHÈN TOÀN BỘ DATA THÔNG TIN CHUNG (Trang bìa Word) VÀO TRƯỚC
+        dataMap.putAll(thongTinChungData);
+
+        // 2. CHÈN DATA TỪ CÁC TAB
+        dataMap.put("<<danh_gia_tinh_hinh>>", tab1.getDanhGia());
+        dataMap.put("<<nhiem_vu>>", tab2.getNhiemVu());
         dataMap.putAll(tab3.getExportData());
         dataMap.putAll(tab4.getExportData());
         dataMap.putAll(tab5.getExportData());
 
-        // LẤY MAP TỪ TAB 6
         Map<String, String> mapTab6 = tab6.getExportData();
         if (mapTab6 != null) dataMap.putAll(mapTab6);
 
