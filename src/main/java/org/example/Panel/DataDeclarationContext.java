@@ -15,4 +15,10 @@ public interface DataDeclarationContext {
     String getHinhThucTapBai();
 
     void navigateStep(int step);
+
+    boolean saveStep1ToDatabase();
+
+    boolean saveStep2ToDatabase();
+
+    boolean saveStep3ToDatabase();
 }

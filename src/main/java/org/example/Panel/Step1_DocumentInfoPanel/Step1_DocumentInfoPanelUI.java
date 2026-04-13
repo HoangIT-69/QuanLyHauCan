@@ -84,7 +84,7 @@ public class Step1_DocumentInfoPanelUI extends JPanel {
         JButton btnNext = UIUtils.createNavButtonWithIcon("Tiếp tục", new Color(41, 128, 185), "/images/next.png", true);
 
         btnNext.addActionListener(e -> {
-            if (validateInputs() && persistStep1()) {
+            if (validateInputs()) {
                 parent.navigateStep(2);
             }
         });
@@ -181,5 +181,9 @@ public class Step1_DocumentInfoPanelUI extends JPanel {
             parent.setCurrentSessionId(result.getNewSessionId());
         }
         return true;
+    }
+
+    public boolean saveToDatabase() {
+        return validateInputs() && persistStep1();
     }
 }

@@ -10,8 +10,6 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import java.awt.*;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.HashMap;
@@ -77,11 +75,7 @@ public class Step2_OrganizationPanelUI extends JPanel {
         JButton btnNext = UIUtils.createNavButtonWithIcon("Tiếp tục", new Color(41, 128, 185), "/images/next.png", true);
 
         btnBack.addActionListener(e -> parent.navigateStep(1));
-        btnNext.addActionListener(e -> {
-            if (saveStep2ToDatabase()) {
-                parent.navigateStep(3);
-            }
-        });
+        btnNext.addActionListener(e -> parent.navigateStep(3));
 
         bottomPanel.add(btnBack, BorderLayout.WEST);
         bottomPanel.add(btnNext, BorderLayout.EAST);
@@ -103,17 +97,12 @@ public class Step2_OrganizationPanelUI extends JPanel {
             }
         });
 
-        addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentShown(ComponentEvent e) {
-                loadAndRestoreUnits();
-            }
-        });
+        loadAndRestoreUnits();
     }
 
     private void loadAndRestoreUnits() {
         int sid = parent.getCurrentSessionId();
-        System.out.println("DEBUG: Step 2 đang nạp SessionID = " + sid);
+       
 
         unitButtons.clear();
         sandboxPanel.removeAll();
@@ -254,6 +243,10 @@ public class Step2_OrganizationPanelUI extends JPanel {
             return false;
         }
         return true;
+    }
+
+    public boolean saveToDatabase() {
+        return saveStep2ToDatabase();
     }
 
     private void initDefaultUnits() {

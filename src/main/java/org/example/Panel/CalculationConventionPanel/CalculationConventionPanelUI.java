@@ -73,7 +73,7 @@ public class CalculationConventionPanelUI extends JPanel {
         gbc.insets = new Insets(8, 10, 8, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        cbDanhMucVC = new JComboBox<>(new String[]{"Quân lương", "Quân trang", "Quân y", "Doanh trại", "Khác"});
+        cbDanhMucVC = new JComboBox<>(new String[]{"Quân lương", "Quân trang", "Quân y", "Doanh trại", "VTKT", "Khác"});
         cbDanhMucVC.setEditable(true);
         txtTenVC = new JTextField();
         txtQuyUocVC = new JTextField();

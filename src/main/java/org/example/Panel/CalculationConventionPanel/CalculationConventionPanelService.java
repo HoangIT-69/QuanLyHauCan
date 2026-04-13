@@ -14,7 +14,7 @@ public class CalculationConventionPanelService {
 
     private static final String SQL_VCHC_ORDER = "SELECT * FROM quyuoc_vchc ORDER BY " +
             "CASE danh_muc WHEN 'Quân lương' THEN 1 WHEN 'Quân trang' THEN 2 " +
-            "WHEN 'Quân y' THEN 3 WHEN 'Doanh trại' THEN 4 WHEN 'Khác' THEN 99 ELSE 5 END, ten_vat_chat";
+            "WHEN 'Quân y' THEN 3 WHEN 'Doanh trại' THEN 4 WHEN 'VTKT' THEN 5 WHEN 'Khác' THEN 99 ELSE 6 END, ten_vat_chat";
 
     private static final String SQL_DAN_ORDER = "SELECT * FROM quyuoc_dan ORDER BY " +
             "CASE danh_muc WHEN 'Đạn phòng không' THEN 1 WHEN 'Đạn chống tăng' THEN 2 " +

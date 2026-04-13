@@ -404,7 +404,14 @@ public class MaterialRegulationTabUI extends JPanel {
 
     private void insertData(MaterialRegulationTabService.CatalogPickRow data) {
         int idx = -1;
-        String search = data.isDan ? "ĐẠN" : "VẬT CHẤT HẬU CẦN";
+        String search;
+        if (data.isDan) {
+            search = "ĐẠN";
+        } else if (data.isVtkt) {
+            search = "VẬT TƯ KỸ THUẬT";
+        } else {
+            search = "VẬT CHẤT HẬU CẦN";
+        }
         for (int i = 0; i < model.getRowCount(); i++) {
             if (model.getValueAt(i, 0).toString().equals(search)) {
                 idx = i + 1;

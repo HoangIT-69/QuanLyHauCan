@@ -10,18 +10,10 @@ public class H2SchemaInitializer {
     private static boolean isInitialized = false;
 
     public static void initialize(Connection conn) {
-        long tEnter = System.currentTimeMillis();
         if (isInitialized || conn == null) {
-            System.out.println("[H2SchemaInitializer] SKIP init — alreadyInitialized=" + isInitialized
-                    + ", connNull=" + (conn == null)
-                    + ", checkElapsedMs=" + (System.currentTimeMillis() - tEnter));
             return;
         }
-
-        long tStartWork = System.currentTimeMillis();
         try (Statement stmt = conn.createStatement()) {
-            System.out.println("⏳ Đang kiểm tra cấu trúc H2 Database (Offline)... [H2SchemaInitializer] FULL run started at t=" + tStartWork);
-
             // 1. Bảng quyuoc_bienche
             stmt.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS `quyuoc_bienche` (" +
@@ -248,16 +240,11 @@ public class H2SchemaInitializer {
                             "SELECT 'admin', '1', 'Quản trị viên', 'Sĩ quan', 'admin' " +
                             "WHERE NOT EXISTS (SELECT 1 FROM `users` WHERE `username` = 'admin');"
             );
+            seedDefaultConventions(stmt);
 
-
-
-            long elapsedMs = System.currentTimeMillis() - tStartWork;
-            System.out.println("✅ Các bảng đã sẵn sàng! [H2SchemaInitializer] FULL init wall-clock: " + elapsedMs + " ms");
             isInitialized = true; // Đánh dấu là đã tạo xong để lần sau không chạy lại nữa
 
         } catch (SQLException e) {
-            long elapsedMs = System.currentTimeMillis() - tStartWork;
-            System.out.println("❌ Lỗi khi khởi tạo cấu trúc bảng (sau " + elapsedMs + " ms): " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -296,5 +283,96 @@ public class H2SchemaInitializer {
             stmt.executeUpdate("UPDATE step3_vat_chat SET ll_db_co_dong = pn_sau WHERE ll_db_co_dong IS NULL");
         } catch (SQLException ignored) {
         }
+    }
+
+    /**
+     * Seed dữ liệu quy ước mặc định (idempotent) để hệ thống có dữ liệu khởi tạo.
+     */
+    private static void seedDefaultConventions(Statement stmt) throws SQLException {
+        // quyuoc_bienche (đủ nhóm: Tiểu đoàn / Trung đoàn / Sư đoàn / Khác)
+        stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
+                "SELECT 'Tiểu đoàn', 'Tiểu đoàn bộ binh', 500, 120, 80, 60, 24, 12, 18, 6, 6, 0, 0, 0 " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Tiểu đoàn bộ binh')");
+        stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
+                "SELECT 'Tiểu đoàn', 'Đại đội hỏa lực', 150, 30, 10, 6, 3, 1, 4, 4, 2, 0, 0, 0 " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Đại đội hỏa lực')");
+        stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
+                "SELECT 'Trung đoàn', 'Trung đoàn bộ binh', 300, 50, 20, 10, 4, 2, 4, 2, 2, 0, 0, 0 " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Trung đoàn bộ binh')");
+        stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
+                "SELECT 'Sư đoàn', 'Tiểu đoàn pháo binh', 420, 80, 20, 8, 4, 2, 6, 8, 6, 4, 2, 2 " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Tiểu đoàn pháo binh')");
+        stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
+                "SELECT 'Khác', 'Đơn vị bảo đảm', 90, 10, 10, 4, 2, 0, 0, 0, 0, 0, 0, 0 " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Đơn vị bảo đảm')");
+
+        // quyuoc_dan (đủ danh mục)
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn phòng không', 'Đạn 12.7mm', 300, 0.115, 'Viên' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn 12.7mm')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn chống tăng', 'Đạn B41', 10, 2.40, 'Quả' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn B41')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn BB nhóm I', 'Đạn 7.62mm', 300, 0.010, 'Viên' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn 7.62mm')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn BB nhóm II', 'Đạn 5.56mm', 360, 0.004, 'Viên' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn 5.56mm')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Mìn, Lựu đạn', 'Lựu đạn mỏ vịt', 2, 0.450, 'Quả' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Lựu đạn mỏ vịt')");
+
+        // quyuoc_vchc (đủ danh mục + item đặc biệt để test nghiệp vụ)
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân lương', 'Gạo tẻ', 1.5, 'Kg/ngày', 'Kg' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Gạo tẻ')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân lương', 'Thịt hộp', 0.25, 'Kg/ngày', 'Kg' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Thịt hộp')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân lương', 'Đường sữa thương binh', 0.02, 'Kg/người/ngày', 'Kg' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Đường sữa thương binh')");
+
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân trang', 'Áo mưa', 1, 'Cái/người', 'Cái' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Áo mưa')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân trang', 'Giày vải', 1, 'Đôi/người', 'Đôi' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Giày vải')");
+
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân y', 'Túi y sĩ', 1, 'Túi/đơn vị', 'Túi' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Túi y sĩ')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân y', 'Túi y tá', 1, 'Túi/đơn vị', 'Túi' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Túi y tá')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân y', 'Túi cứu thương', 1, 'Túi/đơn vị', 'Túi' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Túi cứu thương')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Quân y', 'Thuốc sát trùng', 0.03, 'Lít/người', '%QS' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Thuốc sát trùng')");
+
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Doanh trại', 'Dầu thắp', 0.2, 'Lít/ngày', 'Lít' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Dầu thắp')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Doanh trại', 'Bạt dã chiến', 0.015, 'Tấm/người', 'Tấm' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Bạt dã chiến')");
+
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'VTKT', 'Mỡ bảo quản súng', 0.05, 'Kg/khẩu', 'Kg' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Mỡ bảo quản súng')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'VTKT', 'Dầu súng AK', 0.03, 'Lít/khẩu', 'Lít' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Dầu súng AK')");
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'VTKT', 'Giẻ lau súng', 0.2, 'Kg/100 khẩu', 'Kg' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Giẻ lau súng')");
+
+        stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
+                "SELECT 'Khác', 'Bao tải dã chiến', 0.1, 'Cái/người', 'Cái' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Bao tải dã chiến')");
     }
 }

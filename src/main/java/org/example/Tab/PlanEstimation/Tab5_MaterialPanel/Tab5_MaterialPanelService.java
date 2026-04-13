@@ -107,10 +107,19 @@ public class Tab5_MaterialPanelService {
         if (sessionId < 1) {
             return;
         }
-        String sql = "SELECT loai_vat_chat, "
-                + "COALESCE(SUM(du_tru), 0) AS s_du, "
-                + "COALESCE(SUM(COALESCE(phai_co_0400, 0) + COALESCE(phai_co_scd, 0)), 0) AS s_bs "
-                + "FROM step4_quy_dinh_du_tru WHERE session_id = ? GROUP BY loai_vat_chat";
+        String sql = "SELECT "
+                + "CASE "
+                + "WHEN s4.loai_vat_chat = 1 THEN 1 "
+                + "WHEN s4.loai_vat_chat IN (2, 3) AND LOWER(TRIM(COALESCE(qv.danh_muc, ''))) = 'vtkt' THEN 3 "
+                + "WHEN s4.loai_vat_chat IN (2, 3) THEN 2 "
+                + "ELSE s4.loai_vat_chat "
+                + "END AS loai_norm, "
+                + "COALESCE(SUM(s4.du_tru), 0) AS s_du, "
+                + "COALESCE(SUM(COALESCE(s4.phai_co_0400, 0) + COALESCE(s4.phai_co_scd, 0)), 0) AS s_bs "
+                + "FROM step4_quy_dinh_du_tru s4 "
+                + "LEFT JOIN quyuoc_vchc qv ON s4.vat_chat = qv.ten_vat_chat "
+                + "WHERE s4.session_id = ? "
+                + "GROUP BY loai_norm";
         try (Connection conn = DBConnection.getConnection()) {
             if (conn == null) {
                 return;
@@ -119,7 +128,7 @@ public class Tab5_MaterialPanelService {
                 ps.setInt(1, sessionId);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        int loai = rs.getInt("loai_vat_chat");
+                        int loai = rs.getInt("loai_norm");
                         duTruOut.put(loai, rs.getDouble("s_du"));
                         phaiBoSungOut.put(loai, rs.getDouble("s_bs"));
                     }
@@ -138,9 +147,18 @@ public class Tab5_MaterialPanelService {
         if (sessionId < 1) {
             return map;
         }
-        String sql = "SELECT loai_vat_chat, "
-                + "COALESCE(SUM(COALESCE(kho_d, 0) + COALESCE(don_vi, 0)), 0) AS s "
-                + "FROM step3_vat_chat WHERE session_id = ? GROUP BY loai_vat_chat";
+        String sql = "SELECT "
+                + "CASE "
+                + "WHEN s3.loai_vat_chat = 1 THEN 1 "
+                + "WHEN s3.loai_vat_chat IN (2, 3) AND LOWER(TRIM(COALESCE(qv.danh_muc, ''))) = 'vtkt' THEN 3 "
+                + "WHEN s3.loai_vat_chat IN (2, 3) THEN 2 "
+                + "ELSE s3.loai_vat_chat "
+                + "END AS loai_norm, "
+                + "COALESCE(SUM(COALESCE(s3.kho_d, 0) + COALESCE(s3.don_vi, 0)), 0) AS s "
+                + "FROM step3_vat_chat s3 "
+                + "LEFT JOIN quyuoc_vchc qv ON s3.vat_chat = qv.ten_vat_chat "
+                + "WHERE s3.session_id = ? "
+                + "GROUP BY loai_norm";
         try (Connection conn = DBConnection.getConnection()) {
             if (conn == null) {
                 return map;
@@ -149,7 +167,7 @@ public class Tab5_MaterialPanelService {
                 ps.setInt(1, sessionId);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        int loai = rs.getInt("loai_vat_chat");
+                        int loai = rs.getInt("loai_norm");
                         map.put(loai, rs.getDouble("s"));
                     }
                 }
@@ -195,8 +213,12 @@ public class Tab5_MaterialPanelService {
         if (sessionId < 1) {
             return out;
         }
-        String sql = "SELECT vat_chat, dvt, phai_co_0400, phai_co_scd, pc04_chitiet, scd_chitiet "
-                + "FROM step4_quy_dinh_du_tru WHERE session_id = ? AND loai_vat_chat = ? ORDER BY id ASC LIMIT "
+        String sql = "SELECT s4.vat_chat, s4.dvt, s4.phai_co_0400, s4.phai_co_scd, s4.pc04_chitiet, s4.scd_chitiet "
+                + "FROM step4_quy_dinh_du_tru s4 "
+                + "LEFT JOIN quyuoc_vchc qv ON s4.vat_chat = qv.ten_vat_chat "
+                + "WHERE s4.session_id = ? AND s4.loai_vat_chat = ? "
+                + "AND LOWER(TRIM(COALESCE(qv.danh_muc, ''))) <> 'vtkt' "
+                + "ORDER BY s4.id ASC LIMIT "
                 + TABLE2_MAX_ROWS;
         try (Connection conn = DBConnection.getConnection()) {
             if (conn == null) {
