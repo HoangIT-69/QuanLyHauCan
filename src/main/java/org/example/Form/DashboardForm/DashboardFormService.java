@@ -31,7 +31,7 @@ public class DashboardFormService {
     }
 
     /**
-     * Gói ba trường sinh hoạt từ "Dự kiến" sang placeholder map dùng cho {@code AssurancePlanPanel}.
+     * Gói ba trường sinh hoạt từ "Dự kiến" sang placeholder map dùng cho {@code PN_AssurancePlanPanelUI}.
      */
     public Map<String, String> buildLivingDataForAssurance(String anUong, String mac, String oNguNghi) {
         Map<String, String> m = new HashMap<>();

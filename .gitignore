@@ -1,4 +1,9 @@
 target/
+
+# Compiled bytecode must not live under source roots (IDE shows as binary)
+src/main/java/**/*.class
+src/test/java/**/*.class
+
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

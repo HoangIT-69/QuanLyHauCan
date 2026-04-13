@@ -10,12 +10,17 @@ public class H2SchemaInitializer {
     private static boolean isInitialized = false;
 
     public static void initialize(Connection conn) {
+        long tEnter = System.currentTimeMillis();
         if (isInitialized || conn == null) {
+            System.out.println("[H2SchemaInitializer] SKIP init — alreadyInitialized=" + isInitialized
+                    + ", connNull=" + (conn == null)
+                    + ", checkElapsedMs=" + (System.currentTimeMillis() - tEnter));
             return;
         }
 
+        long tStartWork = System.currentTimeMillis();
         try (Statement stmt = conn.createStatement()) {
-            System.out.println("⏳ Đang kiểm tra cấu trúc H2 Database (Offline)...");
+            System.out.println("⏳ Đang kiểm tra cấu trúc H2 Database (Offline)... [H2SchemaInitializer] FULL run started at t=" + tStartWork);
 
             // 1. Bảng quyuoc_bienche
             stmt.executeUpdate(
@@ -80,9 +85,14 @@ public class H2SchemaInitializer {
                             "  `user_id` INT," +
                             "  `ten_bai_tap` VARCHAR(255)," +
                             "  `ngay_tao` DATETIME," +
-                            "  `trang_thai` TINYINT" +
+                            "  `trang_thai` TINYINT," +
+                            "  `hinh_thuc_tap_bai` VARCHAR(255)" +
                             ");"
             );
+            try {
+                stmt.executeUpdate("ALTER TABLE sessions ADD COLUMN hinh_thuc_tap_bai VARCHAR(255)");
+            } catch (SQLException ignored) {
+            }
 
             // 6. Bảng step1_thong_tin
             stmt.executeUpdate(
@@ -103,7 +113,7 @@ public class H2SchemaInitializer {
                             ");"
             );
 
-            // 7. Bảng step3_vat_chat
+            // 7. Bảng step3_vat_chat (phân cấp theo tên cột nghiệp vụ; giữ cột legacy để migrate)
             stmt.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS `step3_vat_chat` (" +
                             "  `id` INT AUTO_INCREMENT PRIMARY KEY," +
@@ -113,14 +123,69 @@ public class H2SchemaInitializer {
                             "  `dvt` VARCHAR(50)," +
                             "  `kho_d` FLOAT," +
                             "  `don_vi` FLOAT," +
-                            "  `phoi_thuoc` FLOAT," +
                             "  `huong_cy` FLOAT," +
+                            "  `huong_ty_1` FLOAT," +
+                            "  `huong_ty_2` FLOAT," +
+                            "  `ll_cd_vong_ngoai` FLOAT," +
+                            "  `ll_db_co_dong` FLOAT," +
+                            "  `db_bcht` FLOAT," +
+                            "  `ll_con_lai` FLOAT," +
+                            "  `ll_cd_tao_the` FLOAT," +
+                            "  `phoi_thuoc` FLOAT," +
                             "  `huong_ty` FLOAT," +
                             "  `pn_sau` FLOAT," +
-                            "  `ll_con_lai` FLOAT," +
+                            "  `phan_cap_json` TEXT," +
                             "  `ghi_chu` TEXT" +
                             ");"
             );
+
+            migrateStep3VatChatColumns(stmt);
+
+            // 7b. Bảng pn_plan_estimation — nội dung Tab I/II (Dự kiến kế hoạch Phòng ngự)
+            stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS `pn_plan_estimation` (" +
+                            "  `id` INT AUTO_INCREMENT PRIMARY KEY," +
+                            "  `session_id` INT NOT NULL UNIQUE," +
+                            "  `danh_gia` TEXT," +
+                            "  `nhiem_vu` TEXT," +
+                            "  `to_chuc` TEXT," +
+                            "  `bo_tri` TEXT," +
+                            "  `tab4_chi_tieu` TEXT," +
+                            "  `tab4_chuan_bi` TEXT," +
+                            "  `tab4_chien_dau` TEXT," +
+                            "  `tab5_txt_chuan_bi` TEXT," +
+                            "  `tab5_txt_chien_dau` TEXT," +
+                            "  `tab5_txt_sau_cd` TEXT," +
+                            "  `tab6_an_uong` TEXT," +
+                            "  `tab6_mac` TEXT," +
+                            "  `tab6_o_ngu_nghi` TEXT" +
+                            ");"
+            );
+            String[] pnCols = {
+                    "to_chuc TEXT", "bo_tri TEXT",
+                    "tab4_chi_tieu TEXT", "tab4_chuan_bi TEXT", "tab4_chien_dau TEXT",
+                    "tab5_txt_chuan_bi TEXT", "tab5_txt_chien_dau TEXT", "tab5_txt_sau_cd TEXT",
+                    "tab6_an_uong TEXT", "tab6_mac TEXT", "tab6_o_ngu_nghi TEXT"
+            };
+            for (String c : pnCols) {
+                try {
+                    stmt.executeUpdate("ALTER TABLE pn_plan_estimation ADD COLUMN " + c);
+                } catch (SQLException ignored) {
+                }
+            }
+            String[] pnTab10_12 = {
+                    "tab10_tinh_huong TEXT", "tab10_bien_phap TEXT",
+                    "tab11_trien_khai TEXT", "tab11_chi_huy TEXT", "tab11_nguoi_thay_the TEXT",
+                    "tab11_tt_cb TEXT", "tab11_tt_cd TEXT",
+                    "tab11_bc_cb TEXT", "tab11_bc_cd1 TEXT", "tab11_bc_cd2 TEXT",
+                    "tab12_ket_luan TEXT", "tab12_de_nghi TEXT"
+            };
+            for (String c : pnTab10_12) {
+                try {
+                    stmt.executeUpdate("ALTER TABLE pn_plan_estimation ADD COLUMN " + c);
+                } catch (SQLException ignored) {
+                }
+            }
 
             // 8. Bảng step4_hu_hong_vktb
             stmt.executeUpdate(
@@ -186,12 +251,50 @@ public class H2SchemaInitializer {
 
 
 
-            System.out.println("✅ Các bảng đã sẵn sàng!");
+            long elapsedMs = System.currentTimeMillis() - tStartWork;
+            System.out.println("✅ Các bảng đã sẵn sàng! [H2SchemaInitializer] FULL init wall-clock: " + elapsedMs + " ms");
             isInitialized = true; // Đánh dấu là đã tạo xong để lần sau không chạy lại nữa
 
         } catch (SQLException e) {
-            System.out.println("❌ Lỗi khi khởi tạo cấu trúc bảng: " + e.getMessage());
+            long elapsedMs = System.currentTimeMillis() - tStartWork;
+            System.out.println("❌ Lỗi khi khởi tạo cấu trúc bảng (sau " + elapsedMs + " ms): " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * DB cũ có thể thiếu cột phân cấp mới — ALTER + copy từ cột legacy (một lần khi cột mới còn NULL).
+     */
+    private static void migrateStep3VatChatColumns(Statement stmt) {
+        String[] addCols = {
+                "huong_ty_1 FLOAT",
+                "huong_ty_2 FLOAT",
+                "ll_cd_vong_ngoai FLOAT",
+                "ll_db_co_dong FLOAT",
+                "db_bcht FLOAT",
+                "ll_cd_tao_the FLOAT"
+        };
+        for (String c : addCols) {
+            try {
+                stmt.executeUpdate("ALTER TABLE step3_vat_chat ADD COLUMN " + c);
+            } catch (SQLException ignored) {
+            }
+        }
+        try {
+            stmt.executeUpdate("ALTER TABLE step3_vat_chat ADD COLUMN phan_cap_json TEXT");
+        } catch (SQLException ignored) {
+        }
+        try {
+            stmt.executeUpdate("UPDATE step3_vat_chat SET huong_ty_1 = huong_ty WHERE huong_ty_1 IS NULL");
+        } catch (SQLException ignored) {
+        }
+        try {
+            stmt.executeUpdate("UPDATE step3_vat_chat SET ll_cd_vong_ngoai = phoi_thuoc WHERE ll_cd_vong_ngoai IS NULL");
+        } catch (SQLException ignored) {
+        }
+        try {
+            stmt.executeUpdate("UPDATE step3_vat_chat SET ll_db_co_dong = pn_sau WHERE ll_db_co_dong IS NULL");
+        } catch (SQLException ignored) {
         }
     }
 }

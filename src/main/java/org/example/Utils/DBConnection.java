@@ -18,7 +18,9 @@ public class DBConnection {
     // --------------------------------------------------------
     // 2. CẤU HÌNH H2 OFFLINE (Dự phòng)
     // --------------------------------------------------------
-    private static final String H2_URL = "jdbc:h2:file:./data/db_haucan;MODE=MySQL;DATABASE_TO_UPPER=false;CASE_INSENSITIVE_IDENTIFIERS=TRUE;AUTO_SERVER=TRUE";
+    // DB_CLOSE_DELAY=-1: giữ DB mở trong JVM sau khi đóng connection cuối — giảm chi phí mở/đóng file H2 liên tục.
+    // CACHE_SIZE: tăng cache page (KB) cho file-based; phù hợp desktop offline.
+    private static final String H2_URL = "jdbc:h2:file:./data/db_haucan;MODE=MySQL;DATABASE_TO_UPPER=false;CASE_INSENSITIVE_IDENTIFIERS=TRUE;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1;CACHE_SIZE=65536";
     private static final String H2_USER = "sa";
     private static final String H2_PASSWORD = "";
 

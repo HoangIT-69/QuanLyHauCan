@@ -3,10 +3,21 @@ package org.example.Form.DashboardForm;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import org.example.Form.LoginForm.LoginFormUI;
 import org.example.Panel.*;
+import org.example.Panel.PN_AssurancePlanPanel.PN_AssurancePlanPanelService;
+import org.example.Panel.PN_AssurancePlanPanel.PN_AssurancePlanPanelUI;
+import org.example.Panel.PN_PlanEstimationPanel.PN_PlanEstimationPanelUI;
+import org.example.Panel.SessionHistoryPanel.SessionHistoryPanelUI;
+import org.example.Panel.CalculationConventionPanel.CalculationConventionPanelUI;
+import org.example.Panel.DataDeclarationPanel.DataDeclarationPanelUI;
+import org.example.Panel.UserManagementPanel.UserManagementPanelUI;
+import org.example.Panel.UserProfilePanel.UserProfilePanelUI;
+
+import org.example.Utils.DBConnection;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.sql.Connection;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,7 +37,7 @@ public class DashboardFormUI extends JFrame {
     private String currentRole;
     private String hinhThucTapBai;
 
-    private PlanEstimationPanel currentPlanPanel;
+    private PN_PlanEstimationPanelUI currentPlanPanel;
 
     public DashboardFormUI(int userId, String username, String role, String hinhThuc) {
         this.currentUserId = userId;
@@ -183,7 +194,7 @@ public class DashboardFormUI extends JFrame {
         mainContentPanel.setOpaque(false);
         mainContentPanel.setBorder(new EmptyBorder(25, 30, 25, 30));
 
-        SessionHistoryPanel historyPanel = new SessionHistoryPanel(this.currentUserId, new SessionHistoryPanel.SessionActionListener() {
+        SessionHistoryPanelUI historyPanel = new SessionHistoryPanelUI(this.currentUserId, this.hinhThucTapBai, new SessionHistoryPanelUI.SessionActionListener() {
             @Override
             public void onCreateNewSession() {
                 updateDeclarationPanel(-1);
@@ -195,14 +206,18 @@ public class DashboardFormUI extends JFrame {
             }
         });
 
-        mainContentPanel.add(new UserProfilePanel(currentUser), "ThongTin");
-        mainContentPanel.add(new PlanEstimationPanel(currentSessionId), "DuKien");
-        mainContentPanel.add(new AssurancePlanPanel("", "", new HashMap<>(), new HashMap<>(), new HashMap<>(), currentSessionId), "KeHoach");
+        mainContentPanel.add(new UserProfilePanelUI(currentUser), "ThongTin");
+        JComponent duKienInitial = createDuKienPanel(currentSessionId);
+        mainContentPanel.add(duKienInitial, "DuKien");
+        this.currentPlanPanel = duKienInitial instanceof PN_PlanEstimationPanelUI
+                ? (PN_PlanEstimationPanelUI) duKienInitial
+                : null;
+        mainContentPanel.add(createKeHoachPanel(), "KeHoach");
         mainContentPanel.add(historyPanel, "LichSu");
 
         if (dashboardService.isAdminRole(currentRole)) {
-            mainContentPanel.add(new UserManagementPanel(), "NguoiDung");
-            mainContentPanel.add(new CalculationConventionPanel(), "TinhToan");
+            mainContentPanel.add(new UserManagementPanelUI(), "NguoiDung");
+            mainContentPanel.add(new CalculationConventionPanelUI(), "TinhToan");
         }
 
         rootPanel.add(sidebar, BorderLayout.WEST);
@@ -210,23 +225,44 @@ public class DashboardFormUI extends JFrame {
         setContentPane(rootPanel);
 
         cardLayout.show(mainContentPanel, "LichSu");
+
+        // Làm nóng kết nối H2 + chạy H2SchemaInitializer (một lần) ngoài EDT — tránh đơ khi user mở Kế hoạch lần đầu.
+        SwingUtilities.invokeLater(() -> new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() {
+                long t0 = System.currentTimeMillis();
+                try (Connection c = DBConnection.getConnection()) {
+                    if (c != null) {
+                        c.isValid(2);
+                    }
+                } catch (Exception e) {
+                    System.err.println("[DashboardFormUI] DB warmup: " + e.getMessage());
+                }
+                System.out.println("[DashboardFormUI] DB warmup (post-frame) elapsedMs=" + (System.currentTimeMillis() - t0));
+                return null;
+            }
+        }.execute());
     }
 
     private void updateDeclarationPanel(int sessionId) {
         this.currentSessionId = sessionId;
 
         for (Component comp : mainContentPanel.getComponents()) {
-            if (comp instanceof DataDeclarationPanel || comp instanceof PlanEstimationPanel) {
+            if (comp instanceof DataDeclarationPanelUI
+                    || comp instanceof PN_PlanEstimationPanelUI
+                    || comp instanceof DuKienTienCongPlaceholder) {
                 mainContentPanel.remove(comp);
             }
         }
 
-        DataDeclarationPanel declarationPanel = new DataDeclarationPanel(hinhThucTapBai, currentUserId, currentSessionId);
+        DataDeclarationPanelUI declarationPanel = new DataDeclarationPanelUI(hinhThucTapBai, currentUserId, currentSessionId);
         mainContentPanel.add(declarationPanel, "KhaiBao");
 
-        PlanEstimationPanel planPanel = new PlanEstimationPanel(currentSessionId);
-        mainContentPanel.add(planPanel, "DuKien");
-        this.currentPlanPanel = planPanel;
+        JComponent duKien = createDuKienPanel(currentSessionId);
+        mainContentPanel.add(duKien, "DuKien");
+        this.currentPlanPanel = duKien instanceof PN_PlanEstimationPanelUI
+                ? (PN_PlanEstimationPanelUI) duKien
+                : null;
 
         mainContentPanel.revalidate();
         mainContentPanel.repaint();
@@ -286,26 +322,71 @@ public class DashboardFormUI extends JFrame {
                     new LoginFormUI().setVisible(true);
                 }
             } else {
-                switch (cardName) {
-                    case "ThongTin": refreshUserProfile(); break;
-                    case "LichSu": refreshSessionHistory(); break;
-                    case "KeHoach": refreshAssurancePlan(); break;
+                if ("KeHoach".equals(cardName)) {
+                    openKeHoachCard();
+                } else {
+                    switch (cardName) {
+                        case "ThongTin": refreshUserProfile(); break;
+                        case "LichSu": refreshSessionHistory(); break;
+                    }
+                    cardLayout.show(mainContentPanel, cardName);
                 }
-                cardLayout.show(mainContentPanel, cardName);
             }
         });
 
         return btn;
     }
 
-    private void refreshAssurancePlan() {
-        for (Component comp : mainContentPanel.getComponents()) {
-            if (comp instanceof AssurancePlanPanel) {
-                mainContentPanel.remove(comp);
-                break;
-            }
+    /**
+     * Mở tab Kế hoạch: với tập bài Phòng ngự — làm nóng DB + preload ngoài EDT (SwingWorker), rồi tạo panel trên {@code done()}.
+     */
+    private void openKeHoachCard() {
+        AssuranceInputSnapshot snap = snapshotAssuranceInputsFromPlanPanel();
+
+        if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
+            cardLayout.show(mainContentPanel, "KeHoach");
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            SwingWorker<PN_AssurancePlanPanelService.ThongTinChungLoad, Void> worker =
+                    new SwingWorker<>() {
+                        @Override
+                        protected PN_AssurancePlanPanelService.ThongTinChungLoad doInBackground() throws Exception {
+                            long tBg = System.currentTimeMillis();
+                            try (Connection conn = DBConnection.getConnection()) {
+                                if (conn == null) {
+                                    throw new IllegalStateException("Không có kết nối CSDL.");
+                                }
+                                conn.isValid(2);
+                            }
+                            System.out.println("[DashboardFormUI] KeHoach SwingWorker doInBackground (getConnection + isValid) "
+                                    + (System.currentTimeMillis() - tBg) + " ms");
+                            return new PN_AssurancePlanPanelService().loadThongTinChung(currentSessionId);
+                        }
+
+                        @Override
+                        protected void done() {
+                            try {
+                                PN_AssurancePlanPanelService.ThongTinChungLoad preload = get();
+                                installKeHoachContent(snap, preload);
+                                cardLayout.show(mainContentPanel, "KeHoach");
+                            } catch (Exception ex) {
+                                ex.printStackTrace();
+                                JOptionPane.showMessageDialog(DashboardFormUI.this,
+                                        "Lỗi tải kế hoạch bảo đảm: " + ex.getMessage(),
+                                        "Lỗi", JOptionPane.ERROR_MESSAGE);
+                            } finally {
+                                setCursor(Cursor.getDefaultCursor());
+                            }
+                        }
+                    };
+            worker.execute();
+            return;
         }
 
+        installKeHoachContent(snap, null);
+        cardLayout.show(mainContentPanel, "KeHoach");
+    }
+
+    private AssuranceInputSnapshot snapshotAssuranceInputsFromPlanPanel() {
         String danhGia = "";
         String nhiemVu = "";
         Map<String, String> dataTab6 = dashboardService.emptyStringMap();
@@ -322,34 +403,58 @@ public class DashboardFormUI extends JFrame {
             dataTab10 = dashboardService.copyStringMap(currentPlanPanel.getTab10().getProtectionData());
             dataTab11 = dashboardService.copyStringMap(currentPlanPanel.getTab11().getCommandData());
         }
+        return new AssuranceInputSnapshot(danhGia, nhiemVu, dataTab6, dataTab10, dataTab11);
+    }
 
-        AssurancePlanPanel assurancePanel = new AssurancePlanPanel(danhGia, nhiemVu, dataTab6, dataTab10, dataTab11, this.currentSessionId);
-        mainContentPanel.add(assurancePanel, "KeHoach");
+    private void installKeHoachContent(AssuranceInputSnapshot snap,
+                                       PN_AssurancePlanPanelService.ThongTinChungLoad preloadedChung) {
+        for (Component comp : mainContentPanel.getComponents()) {
+            if (comp instanceof PN_AssurancePlanPanelUI || comp instanceof KeHoachTienCongPlaceholder) {
+                mainContentPanel.remove(comp);
+                break;
+            }
+        }
+
+        if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
+            mainContentPanel.add(new PN_AssurancePlanPanelUI(
+                    snap.danhGia(), snap.nhiemVu(), snap.dataTab6(), snap.dataTab10(), snap.dataTab11(),
+                    this.currentSessionId, new PN_AssurancePlanPanelService(), preloadedChung), "KeHoach");
+        } else {
+            mainContentPanel.add(new KeHoachTienCongPlaceholder(), "KeHoach");
+        }
 
         mainContentPanel.revalidate();
         mainContentPanel.repaint();
     }
 
+    private record AssuranceInputSnapshot(
+            String danhGia,
+            String nhiemVu,
+            Map<String, String> dataTab6,
+            Map<String, String> dataTab10,
+            Map<String, String> dataTab11
+    ) {}
+
     private void refreshUserProfile() {
         for (Component comp : mainContentPanel.getComponents()) {
-            if (comp instanceof UserProfilePanel) {
+            if (comp instanceof UserProfilePanelUI) {
                 mainContentPanel.remove(comp);
                 break;
             }
         }
-        mainContentPanel.add(new UserProfilePanel(currentUser), "ThongTin");
+        mainContentPanel.add(new UserProfilePanelUI(currentUser), "ThongTin");
         mainContentPanel.revalidate();
         mainContentPanel.repaint();
     }
 
     private void refreshSessionHistory() {
         for (Component comp : mainContentPanel.getComponents()) {
-            if (comp instanceof SessionHistoryPanel) {
+            if (comp instanceof SessionHistoryPanelUI) {
                 mainContentPanel.remove(comp);
                 break;
             }
         }
-        SessionHistoryPanel historyPanel = new SessionHistoryPanel(this.currentUserId, new SessionHistoryPanel.SessionActionListener() {
+        SessionHistoryPanelUI historyPanel = new SessionHistoryPanelUI(this.currentUserId, this.hinhThucTapBai, new SessionHistoryPanelUI.SessionActionListener() {
             @Override
             public void onCreateNewSession() {
                 updateDeclarationPanel(-1);
@@ -363,5 +468,55 @@ public class DashboardFormUI extends JFrame {
         mainContentPanel.add(historyPanel, "LichSu");
         mainContentPanel.revalidate();
         mainContentPanel.repaint();
+    }
+
+    /**
+     * Chỉ hiển thị đầy đủ Dự kiến kế hoạch khi hình thức tập bài là Phòng ngự; Tiến công: placeholder.
+     */
+    private JComponent createDuKienPanel(int sessionId) {
+        if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
+            return new PN_PlanEstimationPanelUI(sessionId);
+        }
+        return new DuKienTienCongPlaceholder();
+    }
+
+    /**
+     * Chỉ hiển thị đầy đủ Kế hoạch bảo đảm khi hình thức tập bài là Phòng ngự; Tiến công: placeholder.
+     */
+    private JComponent createKeHoachPanel() {
+        if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
+            return new PN_AssurancePlanPanelUI("", "", new HashMap<>(), new HashMap<>(), new HashMap<>(), currentSessionId);
+        }
+        return new KeHoachTienCongPlaceholder();
+    }
+
+    private static final class DuKienTienCongPlaceholder extends JPanel {
+        DuKienTienCongPlaceholder() {
+            setLayout(new BorderLayout());
+            setOpaque(false);
+            JLabel lbl = new JLabel(
+                    "<html><div style='text-align:center;padding:40px;'>"
+                            + "Chức năng <b>Dự kiến kế hoạch</b> cho tập bài <b>Tiến công</b><br/>"
+                            + "đang được phát triển.</div></html>",
+                    SwingConstants.CENTER);
+            lbl.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+            lbl.setForeground(new Color(71, 85, 105));
+            add(lbl, BorderLayout.CENTER);
+        }
+    }
+
+    private static final class KeHoachTienCongPlaceholder extends JPanel {
+        KeHoachTienCongPlaceholder() {
+            setLayout(new BorderLayout());
+            setOpaque(false);
+            JLabel lbl = new JLabel(
+                    "<html><div style='text-align:center;padding:40px;'>"
+                            + "Chức năng <b>Kế hoạch bảo đảm</b> cho tập bài <b>Tiến công</b><br/>"
+                            + "đang được phát triển.</div></html>",
+                    SwingConstants.CENTER);
+            lbl.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+            lbl.setForeground(new Color(71, 85, 105));
+            add(lbl, BorderLayout.CENTER);
+        }
     }
 }
