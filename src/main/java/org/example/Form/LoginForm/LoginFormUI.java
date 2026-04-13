@@ -10,6 +10,7 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.ItemEvent;
 import java.net.URL;
+import java.sql.Connection;
 import java.util.Objects;
 
 public class LoginFormUI extends JFrame {
@@ -19,6 +20,7 @@ public class LoginFormUI extends JFrame {
     private JPasswordField txtPassword;
     private JButton btnLogin;
     private JCheckBox chkShowPass;
+    private JLabel lblDbStatus;
 
     private static final int LOGO_SIZE = 140;
 
@@ -132,6 +134,11 @@ public class LoginFormUI extends JFrame {
         btnLogin.setAlignmentX(Component.CENTER_ALIGNMENT);
         btnLogin.addActionListener(e -> xuLyDangNhap());
 
+        lblDbStatus = new JLabel("Đang kiểm tra kết nối cơ sở dữ liệu...");
+        lblDbStatus.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+        lblDbStatus.setForeground(new Color(100, 116, 139));
+        lblDbStatus.setAlignmentX(Component.CENTER_ALIGNMENT);
+
         loginCard.add(lblLogo);
         loginCard.add(Box.createVerticalStrut(5));
         loginCard.add(lblTitle);
@@ -145,9 +152,45 @@ public class LoginFormUI extends JFrame {
         loginCard.add(chkPanel);
         loginCard.add(Box.createVerticalStrut(20));
         loginCard.add(btnLogin);
+        loginCard.add(Box.createVerticalStrut(10));
+        loginCard.add(lblDbStatus);
 
         bgPanel.add(loginCard);
         setContentPane(bgPanel);
+
+        preCheckDatabaseConnection();
+    }
+
+    private void preCheckDatabaseConnection() {
+        btnLogin.setEnabled(false);
+        SwingWorker<Boolean, Void> checker = new SwingWorker<>() {
+            @Override
+            protected Boolean doInBackground() {
+                try (Connection conn = org.example.Utils.DBConnection.getConnection()) {
+                    return conn != null;
+                } catch (Exception ignored) {
+                    return false;
+                }
+            }
+
+            @Override
+            protected void done() {
+                boolean ok = false;
+                try {
+                    ok = get();
+                } catch (Exception ignored) {
+                }
+                if (ok) {
+                    lblDbStatus.setText("Cơ sở dữ liệu sẵn sàng.");
+                    lblDbStatus.setForeground(new Color(22, 163, 74));
+                } else {
+                    lblDbStatus.setText("Không thể kết nối cơ sở dữ liệu (Online/Offline).");
+                    lblDbStatus.setForeground(new Color(220, 38, 38));
+                }
+                btnLogin.setEnabled(ok);
+            }
+        };
+        checker.execute();
     }
 
     private void xuLyDangNhap() {

@@ -52,11 +52,13 @@ public class Step3_MaterialPanelService {
         public final String name;
         public final String dvt;
         public final boolean isDan;
+        public final boolean isVtkt;
 
-        public PickerEntry(String name, String dvt, boolean isDan) {
+        public PickerEntry(String name, String dvt, boolean isDan, boolean isVtkt) {
             this.name = name;
             this.dvt = dvt != null ? dvt : "";
             this.isDan = isDan;
+            this.isVtkt = isVtkt;
         }
     }
 
@@ -88,7 +90,7 @@ public class Step3_MaterialPanelService {
                  ResultSet rs = stmt.executeQuery(
                          "SELECT ten_vat_chat, don_vi_tinh, danh_muc FROM quyuoc_vchc ORDER BY " +
                                  "CASE danh_muc WHEN 'Quân lương' THEN 1 WHEN 'Quân trang' THEN 2 " +
-                                 "WHEN 'Quân y' THEN 3 WHEN 'Doanh trại' THEN 4 WHEN 'Khác' THEN 99 ELSE 5 END, ten_vat_chat")) {
+                                 "WHEN 'Quân y' THEN 3 WHEN 'Doanh trại' THEN 4 WHEN 'VTKT' THEN 5 WHEN 'Khác' THEN 99 ELSE 6 END, ten_vat_chat")) {
                 while (rs.next()) {
                     list.add(new VchcOption(rs.getString(1), rs.getString(2), rs.getString(3)));
                 }
@@ -103,15 +105,23 @@ public class Step3_MaterialPanelService {
         List<PickerEntry> out = new ArrayList<>();
         for (DanOption d : loadQuyuocDan()) {
             if (!excludeNames.contains(d.name.trim())) {
-                out.add(new PickerEntry(d.name, d.dvt, true));
+                out.add(new PickerEntry(d.name, d.dvt, true, false));
             }
         }
         for (VchcOption v : loadQuyuocVchc()) {
             if (!excludeNames.contains(v.name.trim())) {
-                out.add(new PickerEntry(v.name, v.dvt, false));
+                out.add(new PickerEntry(v.name, v.dvt, false, isVtktCategory(v.danhMuc)));
             }
         }
         return out;
+    }
+
+    static boolean isVtktCategory(String danhMuc) {
+        if (danhMuc == null) {
+            return false;
+        }
+        String s = danhMuc.trim().toLowerCase(Locale.ROOT);
+        return "vtkt".equals(s) || s.contains("vật tư kỹ thuật") || s.contains("vat tu ky thuat");
     }
 
     public static final class LoadedGroups {

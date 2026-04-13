@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 public class MaterialRegulationTabService {
@@ -16,15 +17,20 @@ public class MaterialRegulationTabService {
         public final String name;
         public final String dvt;
         public final boolean isDan;
+        public final boolean isVtkt;
 
-        public CatalogPickRow(String name, String dvt, boolean isDan) {
+        public CatalogPickRow(String name, String dvt, boolean isDan, boolean isVtkt) {
             this.name = name;
             this.dvt = dvt != null ? dvt : "";
             this.isDan = isDan;
+            this.isVtkt = isVtkt;
         }
 
         public String categoryTag() {
-            return isDan ? "Đạn" : "VCHC";
+            if (isDan) {
+                return "Đạn";
+            }
+            return isVtkt ? "VTKT" : "VCHC";
         }
     }
 
@@ -136,15 +142,16 @@ public class MaterialRegulationTabService {
                     while (rs1.next()) {
                         String name = rs1.getString(1);
                         if (name != null && !excludeNames.contains(name.trim())) {
-                            list.add(new CatalogPickRow(name, rs1.getString(2), true));
+                            list.add(new CatalogPickRow(name, rs1.getString(2), true, false));
                         }
                     }
                 }
-                try (ResultSet rs2 = stmt.executeQuery("SELECT ten_vat_chat, don_vi_tinh FROM quyuoc_vchc")) {
+                try (ResultSet rs2 = stmt.executeQuery("SELECT ten_vat_chat, don_vi_tinh, danh_muc FROM quyuoc_vchc")) {
                     while (rs2.next()) {
                         String name = rs2.getString(1);
                         if (name != null && !excludeNames.contains(name.trim())) {
-                            list.add(new CatalogPickRow(name, rs2.getString(2), false));
+                            String danhMuc = rs2.getString(3);
+                            list.add(new CatalogPickRow(name, rs2.getString(2), false, isVtktCategory(danhMuc)));
                         }
                     }
                 }
@@ -153,6 +160,14 @@ public class MaterialRegulationTabService {
             e.printStackTrace();
         }
         return list;
+    }
+
+    private static boolean isVtktCategory(String danhMuc) {
+        if (danhMuc == null) {
+            return false;
+        }
+        String s = danhMuc.trim().toLowerCase(Locale.ROOT);
+        return "vtkt".equals(s) || s.contains("vật tư kỹ thuật") || s.contains("vat tu ky thuat");
     }
 
     public List<LoadedRow> loadQuyDinhDuTru(int sessionId) {

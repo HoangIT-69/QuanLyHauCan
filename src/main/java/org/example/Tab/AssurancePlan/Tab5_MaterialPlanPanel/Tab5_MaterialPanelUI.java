@@ -15,7 +15,6 @@ public class Tab5_MaterialPanelUI extends JPanel {
 
     private Tab5_DanPanelUI panelDan;
     private Tab5_VatChatPanelUI panelVCHC;
-    private Tab5_VatChatPanelUI panelVTKT;
 
     private JTextArea txtGiaiDoanChuanBi;
     private JTextArea txtGiaiDoanChienDau;
@@ -32,7 +31,6 @@ public class Tab5_MaterialPanelUI extends JPanel {
 
         panelDan = new Tab5_DanPanelUI();
         panelVCHC = new Tab5_VatChatPanelUI("b) Vật chất hậu cần", 1);
-        panelVTKT = new Tab5_VatChatPanelUI("c) Vật tư kỹ thuật", 2);
 
         JPanel mainContainer = new JPanel();
         mainContainer.setLayout(new BoxLayout(mainContainer, BoxLayout.Y_AXIS));
@@ -52,8 +50,6 @@ public class Tab5_MaterialPanelUI extends JPanel {
         mainContainer.add(createPopupRow("a. Đạn", "Bảng Chỉ tiêu Đạn", panelDan));
         mainContainer.add(Box.createVerticalStrut(10));
         mainContainer.add(createPopupRow("b. Vật chất hậu cần", "Bảng Chỉ tiêu Vật chất Hậu cần", panelVCHC));
-        mainContainer.add(Box.createVerticalStrut(10));
-        mainContainer.add(createPopupRow("c. Vật tư kỹ thuật", "Bảng Chỉ tiêu Vật tư Kỹ thuật", panelVTKT));
 
         mainContainer.add(Box.createVerticalStrut(30));
 
@@ -124,7 +120,6 @@ public class Tab5_MaterialPanelUI extends JPanel {
         if (sessionId > 0) {
             panelDan.loadDataFromDatabase(sessionId);
             panelVCHC.loadDataFromDatabase(sessionId);
-            panelVTKT.loadDataFromDatabase(sessionId);
         }
     }
 
@@ -132,7 +127,6 @@ public class Tab5_MaterialPanelUI extends JPanel {
         return materialService.buildExportData(
                 panelDan,
                 panelVCHC,
-                panelVTKT,
                 txtGiaiDoanChuanBi.getText(),
                 txtGiaiDoanChienDau.getText(),
                 txtSauChienDau.getText()

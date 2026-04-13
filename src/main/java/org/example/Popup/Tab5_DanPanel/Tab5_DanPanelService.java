@@ -24,16 +24,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * Tổng TL Toàn d (cột 22, 25, 28) sau build được ghi vào {@link #globalTonnageData} — đầu vào cho các bảng tính
  * khác (vận tải, tiêu hao, …), không chỉ phục vụ xuất Word.
+ * Chi tiết từng dòng (loại đạn/vật chất) trong khối Toàn d: {@link #miniTableToanD}.
  */
 public class Tab5_DanPanelService {
 
     public static final int COL_COUNT = 29;
 
-    /** Khóa trong {@link #globalTonnageData}: tổng TL cột 22 Toàn d (Trước nổ → ĐV). */
+    /** Khóa trong {@link #globalTonnageData} / {@link #miniTableToanD} value: TL cột 22 (KHTN → Trước nổ → ĐV). */
     public static final String TL_TRUOC_NO_DV = "TL_TruocNo_DV";
-    /** Khóa trong {@link #globalTonnageData}: tổng TL cột 25 Toàn d (Trước nổ → Kho). */
+    /** Khóa trong {@link #globalTonnageData} / {@link #miniTableToanD} value: TL cột 25 (KHTN → Trước nổ → Kho). */
     public static final String TL_TRUOC_NO_KHO = "TL_TruocNo_Kho";
-    /** Khóa trong {@link #globalTonnageData}: tổng TL cột 28 Toàn d (Thực hành). */
+    /** Khóa trong {@link #globalTonnageData} / {@link #miniTableToanD} value: TL cột 28 (KHTN → Thực hành). */
     public static final String TL_THUC_HANH = "TL_ThucHanh";
 
     /**
@@ -42,12 +43,13 @@ public class Tab5_DanPanelService {
      */
     public static final Map<String, Double> globalTonnageData = new ConcurrentHashMap<>();
 
-    /** Tổng TL Toàn d (cột 22) sau cộng dồn — lưu static để module khác đọc/đối chiếu. */
-    public static volatile double TL_TruocNo_DV_Total = 0.0;
-    /** Tổng TL Toàn d (cột 25) sau cộng dồn — lưu static để module khác đọc/đối chiếu. */
-    public static volatile double TL_TruocNo_Kho_Total = 0.0;
-    /** Tổng TL Toàn d (cột 28) sau cộng dồn — lưu static để module khác đọc/đối chiếu. */
-    public static volatile double TL_ThucHanh_Total = 0.0;
+    /**
+     * Bảng thu nhỏ Toàn d: key = tên loại (cột 0, đã trim), thứ tự giống bảng (LinkedHashMap).
+     * Value: ba TL Kế hoạch tiếp nhận — cột 22 / 25 / 28 (đồng bộ header {@link Tab5_DanPanelUI}).
+     */
+    public static final Map<String, Map<String, Double>> miniTableToanD = new LinkedHashMap<>();
+
+    private static final Object MINI_TABLE_LOCK = new Object();
 
     private static final String TOAN_D_HEADER = "Toàn d";
 
@@ -120,6 +122,7 @@ public class Tab5_DanPanelService {
      * <b>Source of Truth cho xuất Word:</b> {@code DefaultTableModel} trả về đây là nguồn hiển thị đã format sẵn
      * (dòng tổng chỉ còn TL + VK nơi cần); hàm xuất Word sau này nên truyền trực tiếp model này, không cần lọc/parse
      * lại từ {@link #globalTonnageData} — Map toàn cục chỉ phục vụ các mô-đun tính toán khác lấy 3 tổng TL cốt lõi.
+     * Chi tiết từng dòng: {@link #miniTableToanD}.
      */
     public DefaultTableModel getDanTableModel(int sessionId) {
         String[] colIds = new String[COL_COUNT];
@@ -133,16 +136,16 @@ public class Tab5_DanPanelService {
 
         if (sessionId <= 0) {
             globalTonnageData.clear();
-            TL_TruocNo_DV_Total = 0.0;
-            TL_TruocNo_Kho_Total = 0.0;
-            TL_ThucHanh_Total = 0.0;
+            synchronized (MINI_TABLE_LOCK) {
+                miniTableToanD.clear();
+            }
             return model;
         }
 
         globalTonnageData.clear();
-        TL_TruocNo_DV_Total = 0.0;
-        TL_TruocNo_Kho_Total = 0.0;
-        TL_ThucHanh_Total = 0.0;
+        synchronized (MINI_TABLE_LOCK) {
+            miniTableToanD.clear();
+        }
 
         Map<String, Map<String, Integer>> gunByHuong = loadGunCountsByHuong(sessionId);
         List<String> huongs = filterDirections(loadDistinctHuong(sessionId));
@@ -159,12 +162,13 @@ public class Tab5_DanPanelService {
         Map<String, Object[]> toanDLeaf = toanDAgg.displayRows();
         inheritCoSoFromToanDAndRecomputeDirections(leafByHuong, toanDAgg.mergedFullByLabel(), step4Rows, quyUocDan);
 
-        TL_TruocNo_DV_Total = globalTonnageData.getOrDefault(TL_TRUOC_NO_DV, 0.0);
-        TL_TruocNo_Kho_Total = globalTonnageData.getOrDefault(TL_TRUOC_NO_KHO, 0.0);
-        TL_ThucHanh_Total = globalTonnageData.getOrDefault(TL_THUC_HANH, 0.0);
-        System.out.println("[Tab5_DanPanelService] Toàn d totals: TL_TruocNo_DV_Total=" + TL_TruocNo_DV_Total
-                + ", TL_TruocNo_Kho_Total=" + TL_TruocNo_Kho_Total
-                + ", TL_ThucHanh_Total=" + TL_ThucHanh_Total);
+        double tlDv = globalTonnageData.getOrDefault(TL_TRUOC_NO_DV, 0.0);
+        double tlKho = globalTonnageData.getOrDefault(TL_TRUOC_NO_KHO, 0.0);
+        double tlTh = globalTonnageData.getOrDefault(TL_THUC_HANH, 0.0);
+        System.out.println("[Tab5_DanPanelService] Toàn d totals (globalTonnageData): TL_TruocNo_DV=" + tlDv
+                + ", TL_TruocNo_Kho=" + tlKho
+                + ", TL_ThucHanh=" + tlTh);
+        logMiniTableToanD();
 
         appendDirectionBlock(model, TOAN_D_HEADER, toanDLeaf, false);
         for (String huong : huongs) {
@@ -400,6 +404,38 @@ public class Tab5_DanPanelService {
      */
     public static Map<String, Double> getGlobalTonnageDataReadOnly() {
         return Map.copyOf(globalTonnageData);
+    }
+
+    /**
+     * Bản sao chỉ đọc {@link #miniTableToanD} (thứ tự bảo toàn).
+     */
+    public static Map<String, Map<String, Double>> getMiniTableToanDReadOnly() {
+        synchronized (MINI_TABLE_LOCK) {
+            Map<String, Map<String, Double>> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, Double>> e : miniTableToanD.entrySet()) {
+                copy.put(e.getKey(), Map.copyOf(e.getValue()));
+            }
+            return Collections.unmodifiableMap(copy);
+        }
+    }
+
+    private void logMiniTableToanD() {
+        synchronized (MINI_TABLE_LOCK) {
+            if (miniTableToanD.isEmpty()) {
+                System.out.println("[Tab5_DanPanelService] miniTableToanD: (empty)");
+                return;
+            }
+            System.out.println("[Tab5_DanPanelService] ========== miniTableToanD (Toàn d — TL KHTN cột 22/25/28) ==========");
+            for (Map.Entry<String, Map<String, Double>> e : miniTableToanD.entrySet()) {
+                Map<String, Double> m = e.getValue();
+                System.out.printf(Locale.US, "  %-32s | %s: %8.2f | %s: %8.2f | %s: %8.2f%n",
+                        e.getKey(),
+                        TL_TRUOC_NO_DV, m.getOrDefault(TL_TRUOC_NO_DV, 0.0),
+                        TL_TRUOC_NO_KHO, m.getOrDefault(TL_TRUOC_NO_KHO, 0.0),
+                        TL_THUC_HANH, m.getOrDefault(TL_THUC_HANH, 0.0));
+            }
+            System.out.println("[Tab5_DanPanelService] ===================================================================");
+        }
     }
 
     /**
@@ -644,25 +680,54 @@ public class Tab5_DanPanelService {
     }
 
     /**
-     * Sau cộng dồn Toàn d và làm sạch dòng tổng: cộng TL cột 22 / 25 / 28 trên mọi dòng loại đạn vào {@link #globalTonnageData}.
+     * Sau cộng dồn Toàn d: (1) điền {@link #miniTableToanD} theo thứ tự dòng loại đạn + 2 dòng BB (cùng khối Toàn d);
+     * (2) cộng TL cột 22 / 25 / 28 trên các dòng lá (không gồm dòng BB) vào {@link #globalTonnageData}.
      */
     private void populateGlobalTonnageDataFromToanD(Map<String, Object[]> toanDLeaf) {
         double s22 = 0;
         double s25 = 0;
         double s28 = 0;
-        if (toanDLeaf != null) {
-            for (Object[] row : toanDLeaf.values()) {
-                if (row == null) {
-                    continue;
+        synchronized (MINI_TABLE_LOCK) {
+            miniTableToanD.clear();
+            if (toanDLeaf != null) {
+                for (String label : LABEL_TO_BC_COLUMN.keySet()) {
+                    Object[] row = toanDLeaf.get(label);
+                    if (row == null) {
+                        continue;
+                    }
+                    s22 += parseCellDouble(row[22]);
+                    s25 += parseCellDouble(row[25]);
+                    s28 += parseCellDouble(row[28]);
+                    putMiniTableRow(row);
                 }
-                s22 += parseCellDouble(row[22]);
-                s25 += parseCellDouble(row[25]);
-                s28 += parseCellDouble(row[28]);
+                Map<String, Object[]> leafMap = new LinkedHashMap<>();
+                for (String label : LABEL_TO_BC_COLUMN.keySet()) {
+                    Object[] row = toanDLeaf.get(label);
+                    leafMap.put(label, row != null ? row : emptyDataRow(padName(label)));
+                }
+                putMiniTableRow(aggregateGroupRow("      Đạn BB nhóm 2", BB2_SOURCES, leafMap));
+                putMiniTableRow(aggregateGroupRow("      Đạn BB nhóm 1", BB1_SOURCES, leafMap));
             }
         }
         globalTonnageData.put(TL_TRUOC_NO_DV, s22);
         globalTonnageData.put(TL_TRUOC_NO_KHO, s25);
         globalTonnageData.put(TL_THUC_HANH, s28);
+    }
+
+    /** Cột 0 = tên; cột 22/25/28 = TL KHTN (Kế hoạch tiếp nhận — Trước nổ ĐV / Trước nổ Kho / Thực hành). */
+    private void putMiniTableRow(Object[] row) {
+        if (row == null) {
+            return;
+        }
+        String tenVatChat = row[0] != null ? row[0].toString().strip() : "";
+        if (tenVatChat.isEmpty()) {
+            return;
+        }
+        Map<String, Double> tlParams = new LinkedHashMap<>();
+        tlParams.put(TL_TRUOC_NO_DV, parseCellDouble(row[22]));
+        tlParams.put(TL_TRUOC_NO_KHO, parseCellDouble(row[25]));
+        tlParams.put(TL_THUC_HANH, parseCellDouble(row[28]));
+        miniTableToanD.put(tenVatChat, tlParams);
     }
 
     private static boolean contains(int[] arr, int v) {

@@ -18,6 +18,10 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
     private String hinhThucTapBai;
     private int currentUserId;
     private int currentSessionId;
+    private final Step1_DocumentInfoPanelUI step1Panel;
+    private final Step2_OrganizationPanelUI step2Panel;
+    private final Step3_MaterialPanelUI step3Panel;
+    private final Step4_RegulationPanelUI step4Panel;
 
     public DataDeclarationPanelUI(String hinhThucTapBai, int currentUserId, int sessionId) {
         this.hinhThucTapBai = hinhThucTapBai;
@@ -33,10 +37,15 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
         cardPanel = new JPanel(cardLayout);
         cardPanel.setOpaque(false);
 
-        cardPanel.add(new Step1_DocumentInfoPanelUI(this), "Step1");
-        cardPanel.add(new Step2_OrganizationPanelUI(this, hinhThucTapBai), "Step2");
-        cardPanel.add(new Step3_MaterialPanelUI(this, hinhThucTapBai), "Step3");
-        cardPanel.add(new Step4_RegulationPanelUI(this), "Step4");
+        step1Panel = new Step1_DocumentInfoPanelUI(this);
+        step2Panel = new Step2_OrganizationPanelUI(this, hinhThucTapBai);
+        step3Panel = new Step3_MaterialPanelUI(this, hinhThucTapBai);
+        step4Panel = new Step4_RegulationPanelUI(this);
+
+        cardPanel.add(step1Panel, "Step1");
+        cardPanel.add(step2Panel, "Step2");
+        cardPanel.add(step3Panel, "Step3");
+        cardPanel.add(step4Panel, "Step4");
 
         add(cardPanel, BorderLayout.CENTER);
 
@@ -70,11 +79,24 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
         updateStepperUI(step);
 
         Component currentComp = getVisibleCardComponent();
-        if (currentComp instanceof Step3_MaterialPanelUI) {
-            ((Step3_MaterialPanelUI) currentComp).loadDataFromDatabase();
-        } else if (currentComp instanceof Step4_RegulationPanelUI) {
+        if (currentComp instanceof Step4_RegulationPanelUI) {
             ((Step4_RegulationPanelUI) currentComp).refreshData();
         }
+    }
+
+    @Override
+    public boolean saveStep1ToDatabase() {
+        return step1Panel != null && step1Panel.saveToDatabase();
+    }
+
+    @Override
+    public boolean saveStep2ToDatabase() {
+        return step2Panel != null && step2Panel.saveToDatabase();
+    }
+
+    @Override
+    public boolean saveStep3ToDatabase() {
+        return step3Panel != null && step3Panel.saveToDatabasePublic();
     }
 
     private Component getVisibleCardComponent() {

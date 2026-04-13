@@ -55,23 +55,26 @@ public class Step4_RegulationPanelUI extends JPanel {
         bottomPanel.setOpaque(false);
         bottomPanel.setBorder(new EmptyBorder(15, 0, 0, 0));
 
-        JButton btnBack = UIUtils.createNavButtonWithIcon("Quay lại Bước 3", new Color(149, 165, 166), "/images/return.png", false);
+        JButton btnBack = UIUtils.createNavButtonWithIcon("Quay lại ", new Color(149, 165, 166), "/images/return.png", false);
         JButton btnFinish = UIUtils.createNavButtonWithIcon("Lưu & Hoàn tất", new Color(46, 204, 113), "/images/check.png", true);
 
         btnBack.addActionListener(e -> parent.navigateStep(3));
 
         btnFinish.addActionListener(e -> {
+            // Lưu tập trung: Step 1/2/3 chỉ commit DB khi bấm nút ở Step 4.
+            boolean s1 = parent.saveStep1ToDatabase();
+            boolean s2 = s1 && parent.saveStep2ToDatabase();
+            boolean s3 = s2 && parent.saveStep3ToDatabase();
             int sessionId = parent.getCurrentSessionId();
             if (!service.isValidSessionId(sessionId)) {
                 JOptionPane.showMessageDialog(this, "Phiên làm việc không hợp lệ!", "Lỗi", JOptionPane.ERROR_MESSAGE);
                 return;
             }
+            boolean t1 = s3 && tab1.saveToDatabase(sessionId);
+            boolean t2 = t1 && tab2.saveToDatabase(sessionId);
+            boolean t3 = t2 && tab3.saveToDatabase(sessionId);
 
-            boolean t1 = tab1.saveToDatabase(sessionId);
-            boolean t2 = tab2.saveToDatabase(sessionId);
-            boolean t3 = tab3.saveToDatabase(sessionId);
-
-            if (t1 && t2 && t3) {
+            if (s1 && s2 && s3 && t1 && t2 && t3) {
                 JOptionPane.showMessageDialog(this, "Đã lưu toàn bộ dữ liệu Quy định thành công!", "Hoàn tất", JOptionPane.INFORMATION_MESSAGE);
             } else {
                 JOptionPane.showMessageDialog(this, "Có lỗi xảy ra khi lưu dữ liệu, vui lòng kiểm tra Console!", "Lỗi", JOptionPane.ERROR_MESSAGE);

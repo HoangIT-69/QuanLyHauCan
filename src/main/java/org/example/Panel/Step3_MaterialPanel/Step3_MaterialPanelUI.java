@@ -217,18 +217,9 @@ public class Step3_MaterialPanelUI extends JPanel {
         });
 
         btnBack.addActionListener(e -> parent.navigateStep(2));
-        btnNext.addActionListener(e -> {
-            if (saveToDatabase()) {
-                parent.navigateStep(4);
-            }
-        });
+        btnNext.addActionListener(e -> parent.navigateStep(4));
 
-        this.addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override
-            public void componentShown(java.awt.event.ComponentEvent e) {
-                loadDataFromDatabase();
-            }
-        });
+        loadDataFromDatabase();
     }
 
     private static int[] buildColWidths(int phanCount) {
@@ -353,11 +344,21 @@ public class Step3_MaterialPanelUI extends JPanel {
     }
 
     private static String displayForPicker(Step3_MaterialPanelService.PickerEntry e) {
-        return e.isDan ? "[Đạn] " + e.name : "[VCHC] " + e.name;
+        if (e.isDan) {
+            return "[Đạn] " + e.name;
+        }
+        return e.isVtkt ? "[VTKT] " + e.name : "[VCHC] " + e.name;
     }
 
     private void insertPickerRow(Step3_MaterialPanelService.PickerEntry entry) {
-        String headerCol1 = entry.isDan ? "ĐẠN" : "VẬT CHẤT HẬU CẦN";
+        String headerCol1;
+        if (entry.isDan) {
+            headerCol1 = "ĐẠN";
+        } else if (entry.isVtkt) {
+            headerCol1 = "VẬT TƯ KỸ THUẬT";
+        } else {
+            headerCol1 = "VẬT CHẤT HẬU CẦN";
+        }
         int idx = findInsertIndexAfterSection(headerCol1);
         if (idx < 0) {
             return;
@@ -401,6 +402,10 @@ public class Step3_MaterialPanelUI extends JPanel {
             JOptionPane.showMessageDialog(this, "Lỗi khi lưu Database!");
         }
         return ok;
+    }
+
+    public boolean saveToDatabasePublic() {
+        return saveToDatabase();
     }
 
     private List<Step3_MaterialPanelService.Step3SaveRow> collectRowsForSave() {
