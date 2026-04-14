@@ -4,11 +4,12 @@ import org.example.Panel.DataDeclarationContext;
 import org.example.Panel.Step1_DocumentInfoPanel.Step1_DocumentInfoPanelUI;
 import org.example.Panel.Step2_OrganizationPanel.Step2_OrganizationPanelUI;
 import org.example.Panel.Step3_MaterialPanel.Step3_MaterialPanelUI;
+import org.example.Panel.Step4_RegulationPanel.Step4RegulationRamStore;
 import org.example.Panel.Step4_RegulationPanel.Step4_RegulationPanelUI;
 
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.function.IntConsumer;
 
 public class DataDeclarationPanelUI extends JPanel implements DataDeclarationContext {
     private CardLayout cardLayout;
@@ -23,10 +24,23 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
     private final Step3_MaterialPanelUI step3Panel;
     private final Step4_RegulationPanelUI step4Panel;
 
+    /** Last visible wizard step; used to snapshot Step 4 RAM when leaving step 4. */
+    private int lastNavigatedStep = 0;
+
+    private final IntConsumer wizardSessionPersistedListener;
+
     public DataDeclarationPanelUI(String hinhThucTapBai, int currentUserId, int sessionId) {
+        this(hinhThucTapBai, currentUserId, sessionId, null);
+    }
+
+    public DataDeclarationPanelUI(String hinhThucTapBai, int currentUserId, int sessionId,
+                                  IntConsumer wizardSessionPersistedListener) {
         this.hinhThucTapBai = hinhThucTapBai;
         this.currentUserId = currentUserId;
         this.currentSessionId = sessionId;
+        this.wizardSessionPersistedListener = wizardSessionPersistedListener;
+
+        Step4RegulationRamStore.clear();
 
         setLayout(new BorderLayout());
         setOpaque(false);
@@ -59,8 +73,12 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
 
     @Override
     public void setCurrentSessionId(int sessionId) {
+        int prev = this.currentSessionId;
         this.currentSessionId = sessionId;
-        System.out.println("DEBUG: DataDeclarationPanelUI vừa cập nhật SessionId mới = " + sessionId);
+        System.out.println("DEBUG: DataDeclarationPanelUI sessionId -> " + sessionId);
+        if (wizardSessionPersistedListener != null && sessionId > 0 && sessionId != prev) {
+            wizardSessionPersistedListener.accept(sessionId);
+        }
     }
 
     @Override
@@ -75,12 +93,16 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
 
     @Override
     public void navigateStep(int step) {
+        if (lastNavigatedStep == 4 && step != 4 && currentSessionId <= 0) {
+            step4Panel.snapshotDraftToRam();
+        }
+        lastNavigatedStep = step;
+
         cardLayout.show(cardPanel, "Step" + step);
         updateStepperUI(step);
 
-        Component currentComp = getVisibleCardComponent();
-        if (currentComp instanceof Step4_RegulationPanelUI) {
-            ((Step4_RegulationPanelUI) currentComp).refreshData();
+        if (step == 4) {
+            step4Panel.refreshData();
         }
     }
 
@@ -97,15 +119,6 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
     @Override
     public boolean saveStep3ToDatabase() {
         return step3Panel != null && step3Panel.saveToDatabasePublic();
-    }
-
-    private Component getVisibleCardComponent() {
-        for (Component comp : cardPanel.getComponents()) {
-            if (comp.isVisible()) {
-                return comp;
-            }
-        }
-        return null;
     }
 
     private void updateStepperUI(int step) {
@@ -130,11 +143,11 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
         lblStep4 = createStepLabel("4. Quy định dự trữ");
 
         panel.add(lblStep1);
-        panel.add(new JLabel(" ➔ "));
+        panel.add(new JLabel(" \u2794 "));
         panel.add(lblStep2);
-        panel.add(new JLabel(" ➔ "));
+        panel.add(new JLabel(" \u2794 "));
         panel.add(lblStep3);
-        panel.add(new JLabel(" ➔ "));
+        panel.add(new JLabel(" \u2794 "));
         panel.add(lblStep4);
 
         return panel;

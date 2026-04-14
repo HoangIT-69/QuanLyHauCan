@@ -1,5 +1,6 @@
 package org.example.Popup.TotalDataEntryDialog;
 
+import org.example.Popup.UnitDataEntryDialog.UnitDataEntryDialogService;
 import org.example.Utils.DBConnection;
 
 import java.sql.Connection;
@@ -9,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 
 public class TotalDataEntryDialogService {
 
@@ -63,7 +65,74 @@ public class TotalDataEntryDialogService {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        overlayRamStore(groupedData, filterGroup, filterHuong);
         return new AggregatedLoadResult(groupedData);
+    }
+
+    /**
+     * Khi biên chế chỉ nằm trong RAM (chưa lưu bước 4), vẫn tổng hợp được theo cùng logic lọc nhóm như truy vấn DB.
+     * Nếu một hướng có dòng đơn vị trong RAM thì thay thế hoàn toàn nhóm đó (ghi đè phần đã đọc từ DB).
+     */
+    private void overlayRamStore(Map<String, List<Object[]>> groupedData, String filterGroup, String filterHuong) {
+        Map<String, Vector<Vector<Object>>> store = UnitDataEntryDialogService.getSharedStore();
+        if (store == null || store.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Vector<Vector<Object>>> e : store.entrySet()) {
+            String huong = e.getKey();
+            if ("Tiểu đoàn".equals(huong) || "Phối thuộc".equals(huong)) {
+                continue;
+            }
+            if (filterHuong != null && !filterHuong.isBlank() && !filterHuong.equals(huong)) {
+                continue;
+            }
+            List<Object[]> fromRam = extractRowsForFilter(e.getValue(), filterGroup);
+            if (!fromRam.isEmpty()) {
+                groupedData.put(huong, fromRam);
+            }
+        }
+    }
+
+    private static boolean nhomMatchesFilter(String nhom, String filterGroup) {
+        if (nhom == null || filterGroup == null) {
+            return false;
+        }
+        return nhom.equalsIgnoreCase(filterGroup)
+                || ("Tiểu đoàn".equals(filterGroup) && nhom.contains("Tiểu đoàn"));
+    }
+
+    private List<Object[]> extractRowsForFilter(Vector<Vector<Object>> rows, String filterGroup) {
+        List<Object[]> out = new ArrayList<>();
+        if (rows == null || filterGroup == null) {
+            return out;
+        }
+        for (Vector<Object> row : rows) {
+            if (row.isEmpty() || row.get(0) == null) {
+                continue;
+            }
+            String raw = row.get(0).toString().replace("  + ", "").trim();
+            if (raw.startsWith("1.") || raw.startsWith("2.") || raw.equals("TỔNG CỘNG")) {
+                continue;
+            }
+            if (!raw.startsWith("[")) {
+                continue;
+            }
+            int close = raw.indexOf(']');
+            if (close < 1) {
+                continue;
+            }
+            String nhom = raw.substring(1, close).trim();
+            if (!nhomMatchesFilter(nhom, filterGroup)) {
+                continue;
+            }
+            Object[] o = new Object[15];
+            o[0] = raw;
+            for (int i = 1; i < 15; i++) {
+                o[i] = i < row.size() ? row.get(i) : 0;
+            }
+            out.add(o);
+        }
+        return out;
     }
 
     public static final class AggregatedLoadResult {

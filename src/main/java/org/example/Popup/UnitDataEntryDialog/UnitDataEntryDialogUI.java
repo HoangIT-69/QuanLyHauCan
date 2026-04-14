@@ -322,7 +322,6 @@ public class UnitDataEntryDialogUI extends JDialog {
             data.add(new Vector<>((Vector<?>) row));
         }
         UnitDataEntryDialogService.getSharedStore().put(activeUnitName, data);
-        unitService.saveUnitToDatabase(sessionId, activeUnitName, data);
     }
 
     private void loadUnitData(String unitName) {
@@ -336,7 +335,7 @@ public class UnitDataEntryDialogUI extends JDialog {
         UnitDataEntryDialogService.LoadedUnitData loaded = unitService.loadUnitFromDatabase(sessionId, unitName);
         Map<String, Vector<Vector<Object>>> ram = UnitDataEntryDialogService.getSharedStore();
 
-        if (!loaded.hasDataInDb && ram.containsKey(unitName) && !ram.get(unitName).isEmpty()) {
+        if (ram.containsKey(unitName) && !ram.get(unitName).isEmpty()) {
             for (Vector<Object> row : ram.get(unitName)) {
                 model.addRow(row);
             }

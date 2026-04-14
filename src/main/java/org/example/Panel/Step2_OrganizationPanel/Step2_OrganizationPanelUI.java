@@ -92,7 +92,6 @@ public class Step2_OrganizationPanelUI extends JPanel {
         btnReset.addActionListener(e -> {
             if (JOptionPane.showConfirmDialog(this, "Xóa toàn bộ cấu hình hiện tại?", "Xác nhận", JOptionPane.YES_NO_OPTION)
                     == JOptionPane.YES_OPTION) {
-                step2Service.clearStep2ForSession(parent.getCurrentSessionId());
                 loadAndRestoreUnits();
             }
         });
@@ -152,7 +151,6 @@ public class Step2_OrganizationPanelUI extends JPanel {
                     }
                     if (JOptionPane.showConfirmDialog(null, "Xóa bộ phận này khỏi hệ thống?", "Xác nhận", JOptionPane.YES_NO_OPTION)
                             == JOptionPane.YES_OPTION) {
-                        step2Service.deleteUnitFromDatabase(parent.getCurrentSessionId(), name);
                         unitButtons.remove(name);
                         UnitDataEntryDialogService.getSharedStore().remove(name);
                         sandboxPanel.remove(btn);
@@ -179,6 +177,9 @@ public class Step2_OrganizationPanelUI extends JPanel {
         });
         unitButtons.put(name, btn);
         sandboxPanel.add(btn);
+        if (!isVip) {
+            UnitDataEntryDialogService.getSharedStore().computeIfAbsent(name, k -> new Vector<>());
+        }
     }
 
     private void repositionAllUnits() {

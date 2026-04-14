@@ -1,5 +1,6 @@
 package org.example.Tab.Step4_Regulation.CasualtyRegulationTab;
 
+import org.example.Panel.Step4_RegulationPanel.Step4RegulationRamStore;
 import org.example.Utils.InputValidator;
 import org.example.Utils.UIUtils;
 
@@ -61,7 +62,15 @@ public class CasualtyRegulationTabUI extends JPanel {
     public void loadDataFromDatabase(int sessionId) {
         model.setRowCount(0);
 
-        if (sessionId == -1) {
+        if (sessionId <= 0) {
+            List<CasualtyRegulationTabService.Row> ram = Step4RegulationRamStore.getCasualtyDraft();
+            if (ram != null && !ram.isEmpty()) {
+                for (CasualtyRegulationTabService.Row r : ram) {
+                    String hienThiTiLe = (r.tiLe > 0) ? String.valueOf(r.tiLe) : "";
+                    model.addRow(new Object[]{r.loaiThuongBinh, hienThiTiLe});
+                }
+                return;
+            }
             loadDefaultData();
             return;
         }
@@ -96,6 +105,10 @@ public class CasualtyRegulationTabUI extends JPanel {
         for (int i = 0; i < model.getRowCount(); i++) {
             String ten = model.getValueAt(i, 0) != null ? model.getValueAt(i, 0).toString().trim() : "";
             rows.add(new CasualtyRegulationTabService.Row(ten, InputValidator.parseDoubleSafe(model.getValueAt(i, 1))));
+        }
+        if (sessionId <= 0) {
+            Step4RegulationRamStore.setCasualtyDraft(rows);
+            return true;
         }
         return service.saveThuongBinh(sessionId, rows);
     }

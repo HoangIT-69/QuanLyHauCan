@@ -1,5 +1,6 @@
 package org.example.Tab.Step4_Regulation.DamageRegulationTab;
 
+import org.example.Panel.Step4_RegulationPanel.Step4RegulationRamStore;
 import org.example.Utils.InputValidator;
 import org.example.Utils.UIUtils;
 
@@ -10,6 +11,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -58,21 +60,30 @@ public class DamageRegulationTabUI extends JPanel {
         add(pnlControls, BorderLayout.NORTH);
         add(scroll, BorderLayout.CENTER);
 
-        btnRefresh.addActionListener(e -> {
-            if (currentSessionId > 0) {
-                loadDataFromDatabase(currentSessionId);
-            } else {
-                JOptionPane.showMessageDialog(this, "Chưa xác định Session ID!");
-            }
-        });
+        btnRefresh.addActionListener(e -> loadDataFromDatabase(currentSessionId));
     }
 
     public void loadDataFromDatabase(int sessionId) {
         this.currentSessionId = sessionId;
         model.setRowCount(0);
 
-        Map<String, Integer> weaponSums = service.fetchWeaponSums(sessionId);
-        Map<String, Double> savedRates = service.fetchSavedRates(sessionId);
+        Map<String, Integer> weaponSums;
+        Map<String, Double> savedRates;
+        if (sessionId > 0) {
+            weaponSums = service.fetchWeaponSums(sessionId);
+            savedRates = service.fetchSavedRates(sessionId);
+        } else {
+            weaponSums = service.fetchWeaponSumsFromSharedStep2Store();
+            savedRates = new HashMap<>();
+            java.util.List<DamageRegulationTabService.SaveRow> draft = Step4RegulationRamStore.getDamageDraft();
+            if (draft != null) {
+                for (DamageRegulationTabService.SaveRow r : draft) {
+                    if (r.loaiVktb != null) {
+                        savedRates.put(r.loaiVktb.trim().toLowerCase(), r.tiLeHuHong);
+                    }
+                }
+            }
+        }
 
         addRowToModel("1", "Súng ngắn", weaponSums.getOrDefault("sung_ngan", 0), savedRates);
         addRowToModel("2", "Súng Tiểu liên", weaponSums.getOrDefault("tieu_lien", 0), savedRates);
@@ -104,6 +115,10 @@ public class DamageRegulationTabUI extends JPanel {
                     InputValidator.parseIntSafe(model.getValueAt(i, 2)),
                     InputValidator.parseDoubleSafe(model.getValueAt(i, 3))
             ));
+        }
+        if (sessionId <= 0) {
+            Step4RegulationRamStore.setDamageDraft(rows);
+            return true;
         }
         return service.saveHuHongVktbBatch(sessionId, rows);
     }

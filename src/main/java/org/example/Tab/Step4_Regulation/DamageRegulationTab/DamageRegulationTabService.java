@@ -1,6 +1,8 @@
 package org.example.Tab.Step4_Regulation.DamageRegulationTab;
 
+import org.example.Popup.UnitDataEntryDialog.UnitDataEntryDialogService;
 import org.example.Utils.DBConnection;
+import org.example.Utils.InputValidator;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -8,8 +10,62 @@ import java.sql.ResultSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 
 public class DamageRegulationTabService {
+
+    /**
+     * Cộng dồn trang bị từ RAM biên chế Step 2 (khi chưa có session / chưa flush DB).
+     */
+    public Map<String, Integer> fetchWeaponSumsFromSharedStep2Store() {
+        Map<String, Integer> sums = new HashMap<>();
+        sums.put("sung_ngan", 0);
+        sums.put("tieu_lien", 0);
+        sums.put("trung_lien", 0);
+        sums.put("dai_lien", 0);
+        sums.put("b41", 0);
+        sums.put("co60mm", 0);
+        sums.put("co82mm", 0);
+        sums.put("co100mm", 0);
+        sums.put("spg9", 0);
+        sums.put("smpk_127mm", 0);
+
+        Map<String, Vector<Vector<Object>>> store = UnitDataEntryDialogService.getSharedStore();
+        if (store == null) {
+            return sums;
+        }
+        for (Vector<Vector<Object>> rows : store.values()) {
+            if (rows == null) {
+                continue;
+            }
+            for (Vector<Object> row : rows) {
+                if (row == null || row.isEmpty() || row.get(0) == null) {
+                    continue;
+                }
+                String raw = row.get(0).toString().replace("  + ", "").trim();
+                if (raw.startsWith("1.") || raw.startsWith("2.") || raw.equals("TỔNG CỘNG")) {
+                    continue;
+                }
+                if (!raw.startsWith("[")) {
+                    continue;
+                }
+                if (row.size() < 13) {
+                    continue;
+                }
+                sums.merge("sung_ngan", InputValidator.parseIntSafe(row.get(2)), Integer::sum);
+                sums.merge("tieu_lien", InputValidator.parseIntSafe(row.get(3)), Integer::sum);
+                sums.merge("trung_lien", InputValidator.parseIntSafe(row.get(4)), Integer::sum);
+                sums.merge("dai_lien", InputValidator.parseIntSafe(row.get(5)), Integer::sum);
+                sums.merge("b41", InputValidator.parseIntSafe(row.get(6)), Integer::sum);
+                sums.merge("co60mm", InputValidator.parseIntSafe(row.get(8)), Integer::sum);
+                sums.merge("co82mm", InputValidator.parseIntSafe(row.get(9)), Integer::sum);
+                sums.merge("co100mm", InputValidator.parseIntSafe(row.get(10)), Integer::sum);
+                sums.merge("spg9", InputValidator.parseIntSafe(row.get(11)), Integer::sum);
+                sums.merge("smpk_127mm", InputValidator.parseIntSafe(row.get(12)), Integer::sum);
+            }
+        }
+        return sums;
+    }
 
     public Map<String, Integer> fetchWeaponSums(int sessionId) {
         Map<String, Integer> sums = new HashMap<>();

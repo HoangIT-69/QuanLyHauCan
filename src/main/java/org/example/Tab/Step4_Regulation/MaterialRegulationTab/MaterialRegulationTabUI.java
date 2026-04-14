@@ -1,5 +1,6 @@
 package org.example.Tab.Step4_Regulation.MaterialRegulationTab;
 
+import org.example.Panel.Step4_RegulationPanel.Step4RegulationRamStore;
 import org.example.Popup.RegulationDetailDialog.RegulationDetailDialogService;
 import org.example.Popup.RegulationDetailDialog.RegulationDetailDialogUI;
 import org.example.Utils.InputValidator;
@@ -183,7 +184,13 @@ public class MaterialRegulationTabUI extends JPanel {
         RegulationDetailDialogService.detailDataStore.clear();
         initBaseRows();
 
-        if (sessionId == -1) {
+        if (sessionId <= 0) {
+            List<MaterialRegulationTabService.SaveRow> ram = Step4RegulationRamStore.getMaterialDraft();
+            if (ram != null && !ram.isEmpty()) {
+                for (MaterialRegulationTabService.SaveRow s : ram) {
+                    applyLoadedRowFromSave(s);
+                }
+            }
             return;
         }
 
@@ -213,6 +220,45 @@ public class MaterialRegulationTabUI extends JPanel {
         }
     }
 
+    private void applyLoadedRowFromSave(MaterialRegulationTabService.SaveRow s) {
+        MaterialRegulationTabService.LoadedRow r = new MaterialRegulationTabService.LoadedRow(
+                s.loaiVatChat,
+                s.vatChat,
+                s.dvt,
+                s.duTru,
+                s.phaiCo0400,
+                s.phaiCoScd,
+                s.tieuThuGdcb,
+                s.tieuThuGdcd,
+                s.dtChitietJoined,
+                s.pc04ChitietJoined,
+                s.scdChitietJoined,
+                s.gdcbChitietJoined,
+                s.gdcdChitietJoined
+        );
+        Object[] rowData = new Object[]{
+                r.vatChat,
+                r.dvt != null ? r.dvt : "",
+                String.valueOf(r.duTru),
+                String.valueOf(r.phaiCo0400),
+                String.valueOf(r.phaiCoScd),
+                String.valueOf(r.tieuThuGdcb),
+                String.valueOf(r.tieuThuGdcd)
+        };
+        addLoadedDataRow(r.loai, rowData);
+        String vc = r.vatChat;
+        RegulationDetailDialogService.detailDataStore.put(vc + "_" + COL_DU_TRU,
+                RegulationDetailDialogService.upgradeRawPartsToEight(splitCsv(r.dtChitiet)));
+        RegulationDetailDialogService.detailDataStore.put(vc + "_" + COL_0400,
+                RegulationDetailDialogService.upgradeRawPartsToEight(splitCsv(r.pc04Chitiet)));
+        RegulationDetailDialogService.detailDataStore.put(vc + "_" + COL_SCD,
+                RegulationDetailDialogService.upgradeRawPartsToEight(splitCsv(r.scdChitiet)));
+        RegulationDetailDialogService.detailDataStore.put(vc + "_" + COL_GDCB,
+                RegulationDetailDialogService.upgradeRawPartsToEight(splitCsv(r.gdcbChitiet)));
+        RegulationDetailDialogService.detailDataStore.put(vc + "_" + COL_GDCD,
+                RegulationDetailDialogService.upgradeRawPartsToEight(splitCsv(r.gdcdChitiet)));
+    }
+
     private static String[] splitCsv(String s) {
         if (s == null || s.isEmpty()) {
             return new String[0];
@@ -240,6 +286,10 @@ public class MaterialRegulationTabUI extends JPanel {
     public boolean saveToDatabase(int sessionId) {
         if (table.isEditing()) {
             table.getCellEditor().stopCellEditing();
+        }
+        if (sessionId <= 0) {
+            Step4RegulationRamStore.setMaterialDraft(collectSaveRows());
+            return true;
         }
         return service.saveQuyDinhDuTru(sessionId, collectSaveRows());
     }
