@@ -255,7 +255,8 @@ public class DashboardFormUI extends JFrame {
             }
         }
 
-        DataDeclarationPanelUI declarationPanel = new DataDeclarationPanelUI(hinhThucTapBai, currentUserId, currentSessionId);
+        DataDeclarationPanelUI declarationPanel = new DataDeclarationPanelUI(
+                hinhThucTapBai, currentUserId, currentSessionId, this::syncPlanPanelsAfterWizardSessionCreated);
         mainContentPanel.add(declarationPanel, "KhaiBao");
 
         JComponent duKien = createDuKienPanel(currentSessionId);
@@ -268,6 +269,39 @@ public class DashboardFormUI extends JFrame {
         mainContentPanel.repaint();
 
         cardLayout.show(mainContentPanel, "KhaiBao");
+    }
+
+    /**
+     * Khi wizard lưu Step 1 lần đầu (INSERT session), {@link DataDeclarationPanelUI#setCurrentSessionId} gọi lại đây
+     * Updates {@link #currentSessionId} and rebuilds DuKien + KeHoach cards for that id.
+     */
+    private void syncPlanPanelsAfterWizardSessionCreated(int sessionId) {
+        this.currentSessionId = sessionId;
+
+        for (Component comp : mainContentPanel.getComponents()) {
+            if (comp instanceof PN_PlanEstimationPanelUI || comp instanceof DuKienTienCongPlaceholder) {
+                mainContentPanel.remove(comp);
+                break;
+            }
+        }
+        JComponent duKien = createDuKienPanel(currentSessionId);
+        mainContentPanel.add(duKien, "DuKien");
+        this.currentPlanPanel = duKien instanceof PN_PlanEstimationPanelUI
+                ? (PN_PlanEstimationPanelUI) duKien
+                : null;
+
+        if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
+            for (Component comp : mainContentPanel.getComponents()) {
+                if (comp instanceof PN_AssurancePlanPanelUI || comp instanceof KeHoachTienCongPlaceholder) {
+                    mainContentPanel.remove(comp);
+                    break;
+                }
+            }
+            mainContentPanel.add(createKeHoachPanel(), "KeHoach");
+        }
+
+        mainContentPanel.revalidate();
+        mainContentPanel.repaint();
     }
 
     private JButton createMenuButton(String text, String cardName, String iconPath) {

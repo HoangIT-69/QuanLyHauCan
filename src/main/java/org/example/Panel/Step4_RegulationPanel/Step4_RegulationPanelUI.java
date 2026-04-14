@@ -9,8 +9,6 @@ import org.example.Utils.UIUtils;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 
 public class Step4_RegulationPanelUI extends JPanel {
     private final DataDeclarationContext parent;
@@ -43,13 +41,6 @@ public class Step4_RegulationPanelUI extends JPanel {
         tabbedPane.addTab("3. Tỉ lệ Hư hỏng VKTB", tab3);
 
         add(tabbedPane, BorderLayout.CENTER);
-
-        this.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentShown(ComponentEvent e) {
-                refreshData();
-            }
-        });
 
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setOpaque(false);
@@ -86,16 +77,23 @@ public class Step4_RegulationPanelUI extends JPanel {
         add(bottomPanel, BorderLayout.SOUTH);
     }
 
+    /**
+     * Ghi nháp Step 4 vào RAM khi rời bước 4 mà chưa có session (khai báo mới).
+     */
+    public void snapshotDraftToRam() {
+        int sessionId = parent.getCurrentSessionId();
+        if (service.isValidSessionId(sessionId)) {
+            return;
+        }
+        tab1.saveToDatabase(0);
+        tab2.saveToDatabase(0);
+        tab3.saveToDatabase(0);
+    }
+
     public void refreshData() {
         int sessionId = parent.getCurrentSessionId();
-        System.out.println("DEBUG: Step 4 đang nhận SessionID = " + sessionId);
-
-        if (service.isValidSessionId(sessionId)) {
-            tab1.loadDataFromDatabase(sessionId);
-            tab2.loadDataFromDatabase(sessionId);
-            tab3.loadDataFromDatabase(sessionId);
-        } else {
-            System.err.println("CẢNH BÁO: Step 4 chưa nhận được SessionID hợp lệ!");
-        }
+        tab1.loadDataFromDatabase(sessionId);
+        tab2.loadDataFromDatabase(sessionId);
+        tab3.loadDataFromDatabase(sessionId);
     }
 }
