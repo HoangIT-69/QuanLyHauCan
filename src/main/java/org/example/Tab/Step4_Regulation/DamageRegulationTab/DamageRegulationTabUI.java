@@ -89,7 +89,7 @@ public class DamageRegulationTabUI extends JPanel {
         addRowToModel("2", "Súng Tiểu liên", weaponSums.getOrDefault("tieu_lien", 0), savedRates);
         addRowToModel("3", "Súng Trung liên", weaponSums.getOrDefault("trung_lien", 0), savedRates);
         addRowToModel("4", "Súng Đại liên", weaponSums.getOrDefault("dai_lien", 0), savedRates);
-        addRowToModel("5", "B41, M79", weaponSums.getOrDefault("b41", 0), savedRates);
+        addRowToModel("5", "B41", weaponSums.getOrDefault("b41", 0), savedRates);
         addRowToModel("6", "Cối 60mm", weaponSums.getOrDefault("co60mm", 0), savedRates);
         addRowToModel("7", "Cối 82mm", weaponSums.getOrDefault("co82mm", 0), savedRates);
         addRowToModel("8", "Cối 100mm", weaponSums.getOrDefault("co100mm", 0), savedRates);

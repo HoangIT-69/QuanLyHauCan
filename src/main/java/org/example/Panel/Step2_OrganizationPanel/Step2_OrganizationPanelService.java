@@ -22,7 +22,8 @@ public class Step2_OrganizationPanelService {
             "Hướng thứ yếu",
             "Lực lượng chiến đấu vòng ngoài",
             "Lực lượng dự bị cơ động",
-            "Lực lượng còn lại"
+            "Lực lượng còn lại",
+            "Hướng PN phía sau"
     );
 
     private static final List<String> DIRECTIONS_TIEN_CONG = List.of(
@@ -111,6 +112,8 @@ public class Step2_OrganizationPanelService {
 
     /**
      * Lưu toàn bộ step2 từ bộ nhớ RAM ({@link UnitDataEntryDialogService#getSharedStore()}).
+     * Chỉ ghi đè DB cho hướng nào có dữ liệu thật trong RAM (rows không rỗng).
+     * Hướng nào vector rỗng (chưa mở dialog) sẽ bỏ qua — giữ nguyên dữ liệu DB cũ.
      */
     public boolean saveStep2FromRamStore(int sessionId) {
         Map<String, Vector<Vector<Object>>> store = UnitDataEntryDialogService.getSharedStore();
@@ -127,71 +130,66 @@ public class Step2_OrganizationPanelService {
             }
             conn.setAutoCommit(false);
             try {
-                try (PreparedStatement del = conn.prepareStatement(
-                        "DELETE FROM step2_bien_che WHERE session_id = ?")) {
-                    del.setInt(1, sessionId);
-                    del.executeUpdate();
-                }
+                String sqlDel = "DELETE FROM step2_bien_che WHERE session_id = ? AND huong = ?";
+                String sqlIns = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, " +
+                        "(SELECT id FROM quyuoc_bienche WHERE CONCAT('[', nhom_don_vi, '] ', ten_don_vi) = ? LIMIT 1), ?)";
 
-                String sql = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, (SELECT id FROM quyuoc_bienche WHERE CONCAT('[', nhom_don_vi, '] ', ten_don_vi) = ? LIMIT 1), ?)";
-                String sqlFallback = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, 1, 1)";
+                try (PreparedStatement del = conn.prepareStatement(sqlDel);
+                     PreparedStatement ins = conn.prepareStatement(sqlIns)) {
 
-                try (PreparedStatement ins = conn.prepareStatement(sql);
-                     PreparedStatement insFallback = conn.prepareStatement(sqlFallback)) {
+                    // 1. Xóa DB các hướng đã bị xóa khỏi sa bàn (right-click delete)
+                    for (String huong : UnitDataEntryDialogService.getDeletedHuong()) {
+                        del.setInt(1, sessionId);
+                        del.setString(2, huong);
+                        del.addBatch();
+                    }
 
-                    for (String huong : store.keySet()) {
+                    // 2. Lưu các hướng có dữ liệu trong RAM (dialog đã được mở)
+                    for (Map.Entry<String, Vector<Vector<Object>>> entry : store.entrySet()) {
+                        String huong = entry.getKey();
+                        Vector<Vector<Object>> rows = entry.getValue();
+
+                        // Bỏ qua các key đặc biệt (sandbox node)
                         if ("Tiểu đoàn".equals(huong) || "Phối thuộc".equals(huong)) {
                             continue;
                         }
 
-                        Vector<Vector<Object>> rows = store.get(huong);
-                        boolean hasUnits = false;
-
-                        if (rows != null && !rows.isEmpty()) {
-                            int currentLoai = 1;
-                            for (Vector<Object> row : rows) {
-                                if (row.isEmpty() || row.get(0) == null) {
-                                    continue;
-                                }
-                                String rawName = row.get(0).toString();
-
-                                if (rawName.startsWith("1.")) {
-                                    currentLoai = 1;
-                                    continue;
-                                }
-                                if (rawName.startsWith("2.")) {
-                                    currentLoai = 2;
-                                    continue;
-                                }
-                                if (rawName.equals("TỔNG CỘNG")) {
-                                    continue;
-                                }
-
-                                String name = rawName.replace("  + ", "").trim();
-
-                                if (name.startsWith("[") && name.contains("]")) {
-                                    ins.setInt(1, sessionId);
-                                    ins.setString(2, huong);
-                                    ins.setString(3, name);
-                                    ins.setInt(4, currentLoai);
-                                    ins.addBatch();
-                                    hasUnits = true;
-                                }
-                            }
+                        // Vector rỗng = dialog chưa bao giờ được mở → giữ nguyên DB
+                        if (rows == null || rows.isEmpty()) {
+                            continue;
                         }
 
-                        if (!hasUnits) {
-                            insFallback.setInt(1, sessionId);
-                            insFallback.setString(2, huong);
-                            insFallback.addBatch();
+                        // Dialog đã mở (vector có ít nhất header rows) → xóa DB cũ rồi insert lại
+                        del.setInt(1, sessionId);
+                        del.setString(2, huong);
+                        del.addBatch();
+
+                        int currentLoai = 1;
+                        for (Vector<Object> row : rows) {
+                            if (row.isEmpty() || row.get(0) == null) continue;
+                            String rawName = row.get(0).toString();
+
+                            if (rawName.startsWith("1.")) { currentLoai = 1; continue; }
+                            if (rawName.startsWith("2.")) { currentLoai = 2; continue; }
+                            if (rawName.equals("TỔNG CỘNG")) continue;
+
+                            String name = rawName.replace("  + ", "").trim();
+                            if (name.startsWith("[") && name.contains("]")) {
+                                ins.setInt(1, sessionId);
+                                ins.setString(2, huong);
+                                ins.setString(3, name);
+                                ins.setInt(4, currentLoai);
+                                ins.addBatch();
+                            }
                         }
                     }
 
+                    del.executeBatch();
                     ins.executeBatch();
-                    insFallback.executeBatch();
                 }
 
                 conn.commit();
+                UnitDataEntryDialogService.clearDeletedHuong();
                 return true;
             } catch (Exception ex) {
                 conn.rollback();

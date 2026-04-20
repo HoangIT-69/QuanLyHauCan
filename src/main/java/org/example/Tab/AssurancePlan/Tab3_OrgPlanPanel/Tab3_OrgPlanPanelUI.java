@@ -46,7 +46,7 @@ public class Tab3_OrgPlanPanelUI extends JPanel {
         mainContainer.add(lblTitle);
         mainContainer.add(Box.createVerticalStrut(25));
 
-        mainContainer.add(UIUtils.createSectionLabel("1. Tổ chức lực lượng"));
+        mainContainer.add(UIUtils.createSectionLabel("1. Tổ chức sử dụng ,lực lượng"));
         mainContainer.add(Box.createVerticalStrut(10));
         mainContainer.add(createTablePanel());
         mainContainer.add(Box.createVerticalStrut(25));

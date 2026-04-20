@@ -50,7 +50,7 @@ public class Tab5_MaterialPanelUI extends JPanel {
         mainContainer.add(createTable1Panel());
         mainContainer.add(Box.createVerticalStrut(30));
 
-        mainContainer.add(UIUtils.createSectionLabel("2. Dự trữ vật chất hậu cần chi tiết (04.00N / sau chiến đấu) — tối đa 20 loại"));
+        mainContainer.add(UIUtils.createSectionLabel("2. Dự trữ vật chất hậu cần chi tiết "));
         mainContainer.add(createTable2Panel());
         mainContainer.add(Box.createVerticalStrut(30));
 

@@ -153,6 +153,7 @@ public class Step2_OrganizationPanelUI extends JPanel {
                             == JOptionPane.YES_OPTION) {
                         unitButtons.remove(name);
                         UnitDataEntryDialogService.getSharedStore().remove(name);
+                        UnitDataEntryDialogService.markHuongDeleted(name);
                         sandboxPanel.remove(btn);
                         sandboxPanel.repaint();
                     }

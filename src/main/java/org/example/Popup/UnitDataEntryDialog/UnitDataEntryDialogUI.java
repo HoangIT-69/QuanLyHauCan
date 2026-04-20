@@ -46,7 +46,7 @@ public class UnitDataEntryDialogUI extends JDialog {
         lblMainTitle = new JLabel("TỔ CHỨC BIÊN CHẾ, TRANG BỊ " + unitName.toUpperCase(), SwingConstants.CENTER);
         lblMainTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
 
-        String[] columnNames = {"LỰC LƯỢNG", "QUÂN SỐ", "SN", "TL", "TrL", "ĐL", "B41, M79", "Lựu đạn", "60", "82", "100", "SPG9", "12.7", "ON", "ĐB"};
+        String[] columnNames = {"LỰC LƯỢNG", "QUÂN SỐ", "SN", "TL", "TrL", "ĐL", "B41", "Lựu đạn", "60", "82", "100", "SPG9", "12.7", "ON", "ĐB"};
         model = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -185,24 +185,18 @@ public class UnitDataEntryDialogUI extends JDialog {
             return;
         }
 
-        Set<String> addedUnits = new HashSet<>(unitService.loadUsedTenDonViAcrossSession(sessionId));
+        Set<String> addedUnits = new HashSet<>();
 
+        // Snapshot bảng hiện tại vào RAM trước để đảm bảo nhất quán
+        snapshotTableToRam(activeUnitName);
+
+        // Build exclusion list từ RAM store (tất cả hướng) — không dùng DB query (stale)
         for (Vector<Vector<Object>> allData : UnitDataEntryDialogService.getSharedStore().values()) {
             for (Vector<Object> r : allData) {
                 if (r.isEmpty() || r.get(0) == null) {
                     continue;
                 }
                 String name = r.get(0).toString().replace("  + ", "").trim();
-                if (name.contains("]")) {
-                    addedUnits.add(name.substring(name.indexOf("]") + 1).trim());
-                }
-            }
-        }
-
-        for (int i = 0; i < model.getRowCount(); i++) {
-            Object val = model.getValueAt(i, 0);
-            if (val != null) {
-                String name = val.toString().replace("  + ", "").trim();
                 if (name.contains("]")) {
                     addedUnits.add(name.substring(name.indexOf("]") + 1).trim());
                 }
@@ -381,7 +375,7 @@ public class UnitDataEntryDialogUI extends JDialog {
         p.add(UIUtils.createAbsoluteHeaderLabel("ON", x[13], 30, colWidths[13], 70));
         p.add(UIUtils.createAbsoluteHeaderLabel("ĐB", x[14], 30, colWidths[14], 70));
 
-        String[] subCols = {"SN", "TL", "TrL", "ĐL", "B41, M79", "60", "82", "100", "SPG9", "12.7"};
+        String[] subCols = {"SN", "TL", "TrL", "ĐL", "B41", "60", "82", "100", "SPG9", "12.7"};
         int[] subX = {2, 3, 4, 5, 6, 8, 9, 10, 11, 12};
         for (int i = 0; i < subCols.length; i++) {
             p.add(UIUtils.createAbsoluteHeaderLabel(subCols[i], x[subX[i]], 60, colWidths[subX[i]], 40));

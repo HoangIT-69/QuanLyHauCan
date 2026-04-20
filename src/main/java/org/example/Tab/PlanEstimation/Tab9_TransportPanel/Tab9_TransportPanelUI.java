@@ -194,7 +194,7 @@ public class Tab9_TransportPanelUI extends JPanel {
         mainContainer.add(Box.createVerticalStrut(8));
 
         lblCanDoiVanChuyen = new JLabel(" ");
-        lblCanDoiVanChuyen.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblCanDoiVanChuyen.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         lblCanDoiVanChuyen.setForeground(new Color(30, 41, 59));
         JPanel pKetLuan = flowRowTight(lblCanDoiVanChuyen);
         pKetLuan.setMaximumSize(new Dimension(Integer.MAX_VALUE, 400));
@@ -368,7 +368,7 @@ public class Tab9_TransportPanelUI extends JPanel {
 
     private static String ketLuanHtml(String plain) {
         String esc = plain.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-        return "<html><body style='width:820px;font-family:Segoe UI;font-size:14px;font-weight:bold'>"
+        return "<html><body style='width:820px;font-family:Segoe UI;font-size:12px;font-weight:normal'>"
                 + esc.replace("\n", "<br/>") + "</body></html>";
     }
 

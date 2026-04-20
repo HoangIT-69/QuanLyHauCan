@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 
@@ -23,18 +24,56 @@ import java.text.DecimalFormatSymbols;
  */
 public class Tab5_VatChatPanelService {
 
-    /** Khóa trong value map của {@link #miniTableVCHC}: TL (tấn) Bổ sung GĐCB Kho/d. */
+    /** Khóa trong value map của {@link #miniTableVCHC}: TL (tấn) Bổ sung GĐCB Kho/d (d). */
     public static final String TL_BO_SUNG_GDCB_KHO = "TL_BoSung_GDCB_Kho";
-    /** Khóa: TL (tấn) Bổ sung GĐCĐ Kho/d. */
+    /** Khóa: TL (tấn) Bổ sung GĐCB Kho/d (PT). */
+    public static final String TL_BO_SUNG_GDCB_KHO_PT = "TL_BoSung_GDCB_Kho_PT";
+    /** Khóa: TL (tấn) Bổ sung GĐCB ĐV (d). */
+    public static final String TL_BO_SUNG_GDCB_DV_D = "TL_BoSung_GDCB_DV_d";
+    /** Khóa: TL (tấn) Bổ sung GĐCB ĐV (PT). */
+    public static final String TL_BO_SUNG_GDCB_DV_PT = "TL_BoSung_GDCB_DV_PT";
+    /** Khóa: TL (tấn) Bổ sung GĐCĐ Kho/d (× TL Toàn d). */
     public static final String TL_BO_SUNG_GDCD_KHO = "TL_BoSung_GDCD_Kho";
-    /** Khóa: TL (tấn) tổng (+) = GĐCB + GĐCĐ (theo nghiệp vụ Phase 3). */
+    /** Khóa: TL (tấn) Bổ sung GĐCĐ ĐV (× TL Toàn d). */
+    public static final String TL_BO_SUNG_GDCD_DV = "TL_BoSung_GDCD_DV";
+    /** Khóa: TL (tấn) tổng (+) = GĐCB + GĐCĐ. */
     public static final String TL_BO_SUNG_TOTAL = "TL_BoSung_Total";
 
     /**
-     * Khối "I. Toàn d": mỗi vật chất → TL bổ sung (tấn) phục vụ Tab Vận tải. Thứ tự theo duyệt bảng.
+     * Tổng trọng lượng (tấn) khối I. Toàn d — 7 cột bổ sung. Đọc bởi các module khác (vận tải, …).
+     */
+    public static final Map<String, Double> globalTonnageVCHC = new ConcurrentHashMap<>();
+    private static final Object GLOBAL_TONNAGE_LOCK = new Object();
+
+    /**
+     * Khối "I. Toàn d": mỗi vật chất → 7 TL bổ sung (tấn). Thứ tự theo duyệt bảng.
      */
     public static final Map<String, Map<String, Double>> miniTableVCHC = new LinkedHashMap<>();
     private static final Object MINI_VCHC_LOCK = new Object();
+
+    /**
+     * Dữ liệu bổ sung chi tiết theo từng Hướng.
+     * Cấu trúc: Hướng -> (Tên vật chất -> Map<TL_BO_SUNG_..., Giá trị>)
+     */
+    public static final Map<String, Map<String, Map<String, Double>>> miniTableVCHCByDirection = new ConcurrentHashMap<>();
+
+    // ---- Hằng số cho từng nhóm vật chất (dùng cho Tab9) ----
+    public static final String CAT_QN   = "QN";
+    public static final String CAT_QY   = "QY";
+    public static final String CAT_DT   = "DT";
+    public static final String CAT_VTKT = "VTKT";
+    /** Khóa TL vận chuyển GĐCB (tấn, đã loại âm). */
+    public static final String TL_GDCB      = "TL_GDCB";
+    /** Khóa TL vận chuyển GĐCĐ (tấn, đã loại âm). */
+    public static final String TL_GDCD      = "TL_GDCD";
+    /** Khóa TL vận chuyển Toàn trận = GĐCB + GĐCĐ. */
+    public static final String TL_TOAN_TRAN = "TL_ToanTran";
+
+    /**
+     * TL vận chuyển (tấn) theo từng nhóm vật chất: QN, QY, DT, VTKT.
+     * Key ngoài = CAT_QN/QY/DT/VTKT; key trong = TL_GDCB/TL_GDCD/TL_TOAN_TRAN.
+     */
+    public static final Map<String, Map<String, Double>> globalTonnageVCHC_ByCat = new ConcurrentHashMap<>();
 
     // =========================================================
     // New (Hậu cần) read-only 5-column service per requirement
@@ -52,6 +91,8 @@ public class Tab5_VatChatPanelService {
 
     private static final String[] GROUPS_IN_ORDER = {GROUP_1, GROUP_2, GROUP_3, GROUP_4};
     private static final String[] ROMAN = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
+
+    private enum SectionType { TOAN_D, HUONG, LLC }
 
     private record Personnel(int quanSoD, int quanSoPt) {
     }
@@ -96,30 +137,32 @@ public class Tab5_VatChatPanelService {
         Map<String, List<VchcItem>> groups = loadAndGroupQuyUocVchcStrict();
 
         // Phase 3-4: render khung chuẩn
-        appendHauCanSection(model, romanLabel(0) + ". Toàn d", toanD, groups);
+        appendHauCanSection(model, romanLabel(0) + ". Toàn d", toanD, groups, SectionType.TOAN_D);
 
         List<String> huongs = loadDistinctHuong(sessionId);
         for (int i = 0; i < huongs.size(); i++) {
             String huong = huongs.get(i);
             Personnel p = personnelByHuong.getOrDefault(huong, new Personnel(0, 0));
-            appendHauCanSection(model, romanLabel(i + 1) + ". " + huong, p, groups);
+            boolean isLLC = huong.toLowerCase(Locale.ROOT).contains("lực lượng còn lại");
+            SectionType type = isLLC ? SectionType.LLC : SectionType.HUONG;
+            appendHauCanSection(model, romanLabel(i + 1) + ". " + huong, p, groups, type);
         }
     }
 
-    private void appendHauCanSection(DefaultTableModel model, String headerTitle, Personnel p, Map<String, List<VchcItem>> groups) {
+    private void appendHauCanSection(DefaultTableModel model, String headerTitle, Personnel p, Map<String, List<VchcItem>> groups, SectionType type) {
         model.addRow(headerRow5(headerTitle));
         for (String g : GROUPS_IN_ORDER) {
-            appendGroup(model, g, groups.getOrDefault(g, Collections.emptyList()), p);
+            appendGroup(model, g, groups.getOrDefault(g, Collections.emptyList()), p, type);
         }
     }
 
-    private void appendGroup(DefaultTableModel model, String groupName, List<VchcItem> items, Personnel p) {
+    private void appendGroup(DefaultTableModel model, String groupName, List<VchcItem> items, Personnel p, SectionType type) {
         model.addRow(groupRow5(groupName));
         if (items == null || items.isEmpty()) {
             return;
         }
         for (VchcItem it : items) {
-            model.addRow(itemRow5(it, p));
+            model.addRow(itemRow5(it, p, type));
         }
     }
 
@@ -137,21 +180,34 @@ public class Tab5_VatChatPanelService {
         return r;
     }
 
-    private Object[] itemRow5(VchcItem it, Personnel p) {
+    private Object[] itemRow5(VchcItem it, Personnel p, SectionType type) {
         Object[] r = new Object[HC_COL_COUNT];
         Arrays.fill(r, "");
         r[0] = it.tenVatChat();
         r[1] = it.dvt();
 
         double multi = isPercentUnit(it.donViTinh()) ? 0.01 : 1.0;
-        // Phase 3 fix: quân số = 0 => TL = 0 (không default 1)
-        double tlD = it.quyUoc() * p.quanSoD() * multi;
-        double tlPt = it.quyUoc() * p.quanSoPt() * multi;
-        double tlToanD = tlD + tlPt;
-
-        r[2] = fmt2(tlToanD);
-        r[3] = fmt2(tlD);
-        r[4] = fmt2(tlPt);
+        switch (type) {
+            case TOAN_D -> {
+                double tlD = it.quyUoc() * p.quanSoD() * multi;
+                double tlPt = it.quyUoc() * p.quanSoPt() * multi;
+                r[2] = fmt2(tlD + tlPt);
+                r[3] = fmt2(tlD);
+                r[4] = fmt2(tlPt);
+            }
+            case HUONG -> {
+                // Chỉ hiện TL Toàn d = quanSoD, cột d và PT để "-"
+                r[2] = fmt2(it.quyUoc() * p.quanSoD() * multi);
+                r[3] = "-";
+                r[4] = "-";
+            }
+            case LLC -> {
+                // Lực lượng còn lại: TL Toàn d = quanSoPt (phối thuộc), cột d và PT để "-"
+                r[2] = fmt2(it.quyUoc() * p.quanSoPt() * multi);
+                r[3] = "-";
+                r[4] = "-";
+            }
+        }
         return r;
     }
 
@@ -207,10 +263,12 @@ public class Tab5_VatChatPanelService {
                     String nhom = rs.getString("nhom_don_vi");
                     int qs = rs.getInt("tong_qs");
                     int[] arr = tmp.computeIfAbsent(huong, k -> new int[]{0, 0});
-                    if ("Tiểu đoàn".equalsIgnoreCase(nhom != null ? nhom.trim() : "")) {
+                    String nhomTrim = nhom != null ? nhom.trim() : "";
+                    if ("Tiểu đoàn".equalsIgnoreCase(nhomTrim)) {
                         arr[0] += qs;
                         sumD += qs;
-                    } else if ("Trung đoàn".equalsIgnoreCase(nhom != null ? nhom.trim() : "")) {
+                    } else if (nhomTrim.contains("\u0111o\u00e0n") && !nhomTrim.contains("Ti\u1ec3u")) {
+                        // Trung đoàn + Sư đoàn đều tính vào phối thuộc (PT)
                         arr[1] += qs;
                         sumPt += qs;
                     }
@@ -393,12 +451,14 @@ public class Tab5_VatChatPanelService {
         if (sessionId <= 0) {
             synchronized (MINI_VCHC_LOCK) {
                 miniTableVCHC.clear();
+                miniTableVCHCByDirection.clear();
             }
             return;
         }
         if (type == 1) {
             synchronized (MINI_VCHC_LOCK) {
                 miniTableVCHC.clear();
+                miniTableVCHCByDirection.clear();
             }
         }
 
@@ -427,7 +487,8 @@ public class Tab5_VatChatPanelService {
                 if ("Tiểu đoàn".equalsIgnoreCase(nhom)) {
                     quanSo_d_ToanD += qs;
                     quanSoTheoHuongD.put(huong, quanSoTheoHuongD.getOrDefault(huong, 0.0) + qs);
-                } else if ("Trung đoàn".equalsIgnoreCase(nhom)) {
+                } else if (nhom != null && nhom.contains("\u0111o\u00e0n") && !nhom.contains("Ti\u1ec3u")) {
+                    // Trung đoàn + Sư đoàn đều tính vào phối thuộc (PT)
                     quanSo_pt_ToanD += qs;
                     quanSoTheoHuongPT.put(huong, quanSoTheoHuongPT.getOrDefault(huong, 0.0) + qs);
                 }
@@ -558,6 +619,10 @@ public class Tab5_VatChatPanelService {
         int rowIdxToanD = -1;
         double[] tongLlclAgg = null;
 
+        // Tích lũy TL vận chuyển theo nhóm (chỉ khối Toàn d, type=1): [0]=QN, [1]=QY, [2]=DT, [3]=VTKT
+        double[] catGdcb = new double[4];
+        double[] catGdcd = new double[4];
+
         for (String huongName : blocks) {
             final boolean isLlcl = "__LLCL__".equals(huongName);
             final boolean isToanD = "Toàn d".equals(huongName);
@@ -663,9 +728,22 @@ public class Tab5_VatChatPanelService {
                     Arrays.fill(row, "-");
                     row[0] = item.ten;
                     row[1] = item.dvt;
-                    row[2] = fmtCoeff(tlDvtToanD);
-                    row[3] = fmtCoeff(tlDvtD);
-                    row[4] = (isDirection || ptExc) ? "-" : fmtCoeff(tlDvtPT);
+                    if (isDirection) {
+                        // Các hướng: TL Toàn d = quanSoD, d và PT để "-"
+                        row[2] = fmtCoeff(tlDvtD);
+                        row[3] = "-";
+                        row[4] = "-";
+                    } else if (isLlcl) {
+                        // Lực lượng còn lại: TL Toàn d = quanSoPt (phối thuộc), d và PT để "-"
+                        row[2] = fmtCoeff(tlDvtPT);
+                        row[3] = "-";
+                        row[4] = "-";
+                    } else {
+                        // Toàn d: hiển thị đầy đủ
+                        row[2] = fmtCoeff(tlDvtToanD);
+                        row[3] = fmtCoeff(tlDvtD);
+                        row[4] = ptExc ? "-" : fmtCoeff(tlDvtPT);
+                    }
 
                     row[5] = fmtCoeff(wQddt);
                     row[6] = fmtCoeff(wTtGdcb);
@@ -767,10 +845,32 @@ public class Tab5_VatChatPanelService {
                     row[26] = "";
 
                     if (type == 1 && isToanD && !isDuongSuaThuongBinh(item.ten)) {
+                        // Bổ sung chỉ có Kho và ĐV, không có PT
+                        // GĐCB Kho/d × TL Toàn d (khớp addTonWeighted col 18)
                         double tonGdcbKho = b18 * tlDvtToanD / 1000.0;
+                        // GĐCB ĐV × TL d (khớp addTonWeighted col 19)
+                        double tonGdcbDv  = b19 * tlDvtD     / 1000.0;
+                        // GĐCĐ Kho/d × TL Toàn d (khớp addTonWeighted col 20)
                         double tonGdcdKho = b20 * tlDvtToanD / 1000.0;
-                        double tonPlus = (b18 * tlDvtToanD + b19 * tlDvtD + b20 * tlDvtToanD + b21 * tlDvtD) / 1000.0;
-                        recordMiniTableVchcRow(item.ten, tonGdcbKho, tonGdcdKho, tonPlus);
+                        // GĐCĐ ĐV × TL d (khớp addTonWeighted col 21)
+                        double tonGdcdDv  = b21 * tlDvtD     / 1000.0;
+                        double tonPlus = tonGdcbKho + tonGdcbDv + tonGdcdKho + tonGdcdDv;
+                        recordMiniTableVchcRow(item.ten, c,
+                                tonGdcbKho, tonGdcbDv, tonGdcdKho, tonGdcdDv, tonPlus);
+                    } else if (type == 1 && isDirection && !isDuongSuaThuongBinh(item.ten)) {
+                        double tonGdcbKho = b18 * tlDvtToanD / 1000.0;
+                        double tonGdcbDv  = b19 * tlDvtD     / 1000.0;
+                        double tonGdcdKho = b20 * tlDvtToanD / 1000.0;
+                        double tonGdcdDv  = b21 * tlDvtD     / 1000.0;
+                        synchronized (MINI_VCHC_LOCK) {
+                            miniTableVCHCByDirection.computeIfAbsent(huongName, k -> new ConcurrentHashMap<>());
+                            Map<String, Double> cmDir = new LinkedHashMap<>();
+                            cmDir.put(TL_BO_SUNG_GDCB_KHO, Math.max(0, tonGdcbKho));
+                            cmDir.put(TL_BO_SUNG_GDCB_DV_D, Math.max(0, tonGdcbDv));
+                            cmDir.put(TL_BO_SUNG_GDCD_KHO, Math.max(0, tonGdcdKho));
+                            cmDir.put(TL_BO_SUNG_GDCD_DV, Math.max(0, tonGdcdDv));
+                            miniTableVCHCByDirection.get(huongName).put(item.ten, cmDir);
+                        }
                     }
 
                     if (isToanD && hasKho) {
@@ -789,6 +889,12 @@ public class Tab5_VatChatPanelService {
 
                 if (hasKho) {
                     tongCat[22] = tongCat[18] + tongCat[19] + tongCat[20] + tongCat[21];
+                }
+
+                // Tích lũy TL vận chuyển (≥0) theo nhóm cho Tab9
+                if (isToanD && type == 1) {
+                    catGdcb[c] = Math.max(0.0, tongCat[18] + tongCat[19]);
+                    catGdcd[c] = Math.max(0.0, tongCat[20] + tongCat[21]);
                 }
 
                 for (int col = 5; col <= 22; col++) {
@@ -826,6 +932,50 @@ public class Tab5_VatChatPanelService {
                 double v = sumDirectionsAgg[col] + tongLlclAgg[col];
                 vatChatModel.setValueAt("<html><b>" + fmtTonBold(v) + "</b></html>", rowIdxToanD, col);
             }
+        }
+
+        // Ghi TL vận chuyển theo nhóm vào globalTonnageVCHC_ByCat
+        if (type == 1) {
+            String[] catKeys = {CAT_QN, CAT_QY, CAT_DT, CAT_VTKT};
+            globalTonnageVCHC_ByCat.clear();
+            for (int i = 0; i < 4; i++) {
+                Map<String, Double> cm = new LinkedHashMap<>();
+                cm.put(TL_GDCB,      catGdcb[i]);
+                cm.put(TL_GDCD,      catGdcd[i]);
+                cm.put(TL_TOAN_TRAN, catGdcb[i] + catGdcd[i]);
+                globalTonnageVCHC_ByCat.put(catKeys[i], cm);
+            }
+            System.out.printf(Locale.US,
+                    "[VCHC-ByCat] QN: GDCB=%.3f GDCD=%.3f | QY: GDCB=%.3f GDCD=%.3f | DT: GDCB=%.3f GDCD=%.3f | VTKT: GDCB=%.3f GDCD=%.3f (tấn)%n",
+                    catGdcb[0], catGdcd[0], catGdcb[1], catGdcd[1],
+                    catGdcb[2], catGdcd[2], catGdcb[3], catGdcd[3]);
+        }
+
+        // Cộng dồn tổng 7 cột Bổ sung (tấn) từ miniTableVCHC vào globalTonnageVCHC
+        if (type == 1) {
+            synchronized (MINI_VCHC_LOCK) {
+                double sumGdcbKho = 0, sumGdcbDv = 0;
+                double sumGdcdKho = 0, sumGdcdDv = 0, sumPlus = 0;
+                for (Map<String, Double> m : miniTableVCHC.values()) {
+                    sumGdcbKho += m.getOrDefault(TL_BO_SUNG_GDCB_KHO,   0.0);
+                    sumGdcbDv  += m.getOrDefault(TL_BO_SUNG_GDCB_DV_D,  0.0);
+                    sumGdcdKho += m.getOrDefault(TL_BO_SUNG_GDCD_KHO,   0.0);
+                    sumGdcdDv  += m.getOrDefault(TL_BO_SUNG_GDCD_DV,    0.0);
+                    sumPlus    += m.getOrDefault(TL_BO_SUNG_TOTAL,       0.0);
+                }
+                globalTonnageVCHC.put(TL_BO_SUNG_GDCB_KHO,   sumGdcbKho);
+                globalTonnageVCHC.put(TL_BO_SUNG_GDCB_DV_D,  sumGdcbDv);
+                globalTonnageVCHC.put(TL_BO_SUNG_GDCD_KHO,   sumGdcdKho);
+                globalTonnageVCHC.put(TL_BO_SUNG_GDCD_DV,    sumGdcdDv);
+                globalTonnageVCHC.put(TL_BO_SUNG_TOTAL,       sumPlus);
+            }
+            System.out.printf(Locale.US,
+                    "[VCHC-TỔNG] GĐCBKho=%7.3f GĐCBDv=%7.3f | GĐCĐKho=%7.3f GĐCĐDv=%7.3f | (+)=%7.3f (tấn)%n",
+                    globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCB_KHO,  0.0),
+                    globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCB_DV_D, 0.0),
+                    globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCD_KHO,  0.0),
+                    globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCD_DV,   0.0),
+                    globalTonnageVCHC.getOrDefault(TL_BO_SUNG_TOTAL,      0.0));
         }
     }
 
@@ -905,6 +1055,27 @@ public class Tab5_VatChatPanelService {
         }
     }
 
+    public static Map<String, Map<String, Map<String, Double>>> getMiniTableVCHCByDirectionReadOnly() {
+        synchronized (MINI_VCHC_LOCK) {
+            Map<String, Map<String, Map<String, Double>>> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, Map<String, Double>>> dirEntry : miniTableVCHCByDirection.entrySet()) {
+                Map<String, Map<String, Double>> dirMap = new LinkedHashMap<>();
+                for (Map.Entry<String, Map<String, Double>> itemEntry : dirEntry.getValue().entrySet()) {
+                    dirMap.put(itemEntry.getKey(), Map.copyOf(itemEntry.getValue()));
+                }
+                copy.put(dirEntry.getKey(), Collections.unmodifiableMap(dirMap));
+            }
+            return Collections.unmodifiableMap(copy);
+        }
+    }
+
+    /**
+     * Bản sao chỉ đọc {@link #globalTonnageVCHC_ByCat}: TL vận chuyển theo nhóm QN/QY/DT/VTKT.
+     */
+    public static Map<String, Map<String, Double>> getGlobalTonnageVCHC_ByCatReadOnly() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(globalTonnageVCHC_ByCat));
+    }
+
     private static boolean isDuongSuaThuongBinh(String ten) {
         if (ten == null) {
             return false;
@@ -934,26 +1105,43 @@ public class Tab5_VatChatPanelService {
     }
 
     /**
-     * @param tlBoSungGdcbKhoTon TL bổ sung GĐCB (Kho/d), tấn
-     * @param tlBoSungGdcdKhoTon TL bổ sung GĐCĐ (Kho/d), tấn
-     * @param tlBoSungTotalTon   (+) tấn = tổng có trọng số TL như bảng
+     * Lưu 7 TL bổ sung (tấn) cho từng vật chất vào {@link #miniTableVCHC} và cộng dồn vào {@link #globalTonnageVCHC}.
+     * In ra console để kiểm tra (tương tự Tab5_DanPanel).
      */
     private void recordMiniTableVchcRow(
             String tenVatChat,
-            double tlBoSungGdcbKhoTon,
-            double tlBoSungGdcdKhoTon,
-            double tlBoSungTotalTon
+            int catIndex,
+            double tonGdcbKho,
+            double tonGdcbDv,
+            double tonGdcdKho,
+            double tonGdcdDv,
+            double tonPlus
     ) {
         if (tenVatChat == null || tenVatChat.isBlank()) {
             return;
         }
         Map<String, Double> m = new LinkedHashMap<>();
-        m.put(TL_BO_SUNG_GDCB_KHO, tlBoSungGdcbKhoTon);
-        m.put(TL_BO_SUNG_GDCD_KHO, tlBoSungGdcdKhoTon);
-        m.put(TL_BO_SUNG_TOTAL, tlBoSungTotalTon);
+        m.put("CATEGORY", (double) catIndex);
+        m.put(TL_BO_SUNG_GDCB_KHO, tonGdcbKho);
+        m.put(TL_BO_SUNG_GDCB_DV_D, tonGdcbDv);
+        m.put(TL_BO_SUNG_GDCD_KHO,  tonGdcdKho);
+        m.put(TL_BO_SUNG_GDCD_DV,   tonGdcdDv);
+        m.put(TL_BO_SUNG_TOTAL,      tonPlus);
         synchronized (MINI_VCHC_LOCK) {
             miniTableVCHC.put(tenVatChat.trim(), m);
         }
+        
+        String catPrefix = "VCHC";
+        if (catIndex == 0) catPrefix = "QN";
+        else if (catIndex == 1) catPrefix = "QY";
+        else if (catIndex == 2) catPrefix = "DT";
+        else if (catIndex == 3) catPrefix = "VTKT";
+        
+        System.out.printf(Locale.US,
+                "[%s] %-30s | GĐCBKho=%7.3f GĐCBDv=%7.3f | GĐCĐKho=%7.3f GĐCĐDv=%7.3f | (+)=%7.3f (tấn)%n",
+                catPrefix, tenVatChat.trim(),
+                tonGdcbKho + 0.0, tonGdcbDv + 0.0,
+                tonGdcdKho + 0.0, tonGdcdDv + 0.0, tonPlus + 0.0);
     }
 
     private String f(double value) {
@@ -966,26 +1154,97 @@ public class Tab5_VatChatPanelService {
         return String.format(Locale.US, "%.2f", value);
     }
 
+    /**
+     * Xuất dữ liệu bảng Vật chất theo keyword từng ô: {{vc_r{row}_c{col}}} (type=1 VCHC)
+     * hoặc {{vtkt_r{row}_c{col}}} (type=2 VTKT).
+     * <p>
+     * Bảng Word template có 80 dòng dữ liệu × 28 ô/dòng (col 0..27).<br>
+     * Mapping ô Word ↔ cột UI (27 cột 0..26):
+     * <ul>
+     *   <li>col 0  → STT (tự tăng)</li>
+     *   <li>col 1  → UI col 0  (Chỉ tiêu)</li>
+     *   <li>col 2  → UI col 1  (ĐVT)</li>
+     *   <li>col 3  → UI col 2  (TL ĐVT Toàn d)</li>
+     *   <li>col 4  → UI col 3  (TL ĐVT d)</li>
+     *   <li>col 5  → UI col 4  (TL ĐVT PT)</li>
+     *   <li>col 6  → UI col 5  (QDDT)</li>
+     *   <li>col 7  → UI col 6  (TT GĐCB)</li>
+     *   <li>col 8  → UI col 7  (TT GĐCĐ)</li>
+     *   <li>col 9  → UI col 8  (PC SCĐ Kho/d)</li>
+     *   <li>col 10 → UI col 9  (PC SCĐ ĐV)</li>
+     *   <li>col 11 → UI col 10 (PC SCĐ +)</li>
+     *   <li>col 12 → UI col 11 (HC Kho d)</li>
+     *   <li>col 13 → UI col 12 (HC Kho PT)</li>
+     *   <li>col 14 → UI col 13 (HC ĐV d)</li>
+     *   <li>col 15 → UI col 14 (HC ĐV PT)</li>
+     *   <li>col 16 → UI col 15 (HC +)</li>
+     *   <li>col 17 → UI col 16 (BS TQĐ Kho/d)</li>
+     *   <li>col 18 → UI col 17 (BS TQĐ ĐV)</li>
+     *   <li>col 19 → UI col 18 (BS GĐCB Kho/d)</li>
+     *   <li>col 20 → UI col 19 (BS GĐCB ĐV)</li>
+     *   <li>col 21 → UI col 20 (BS GĐCĐ Kho/d)</li>
+     *   <li>col 22 → UI col 21 (BS GĐCĐ ĐV)</li>
+     *   <li>col 23 → UI col 22 (BS +)</li>
+     *   <li>col 24 → UI col 23 (KH Thời gian)</li>
+     *   <li>col 25 → UI col 24 (KH Địa điểm)</li>
+     *   <li>col 26 → UI col 25 (KH Phương thức)</li>
+     *   <li>col 27 → UI col 26 (KH Nhiệm vụ)</li>
+     * </ul>
+     */
     public Map<String, String> getExportData(int type, DefaultTableModel vatChatModel) {
         Map<String, String> data = new HashMap<>();
-        String key = (type == 1) ? "<<rows_bang_vat_chat>>" : "<<rows_bang_vat_tu>>";
-        data.put(key, buildTableHtml(vatChatModel));
+        final int WORD_MAX_ROWS = 80;   // số dòng dữ liệu trong Word template
+        final int WORD_CELLS    = 28;   // 1 TT + 27 cột UI
+        final int UI_COLS       = 27;   // số cột trong model UI
+
+        // Prefix keyword theo type
+        String prefix = (type == 1) ? "vc" : "vtkt";
+
+        // Lấy danh sách hàng cần xuất
+        List<Object[]> exportRows = new ArrayList<>();
+        if (vatChatModel != null) {
+            for (int i = 0; i < vatChatModel.getRowCount() && exportRows.size() < WORD_MAX_ROWS; i++) {
+                Object[] row = new Object[UI_COLS];
+                for (int j = 0; j < UI_COLS; j++) {
+                    row[j] = vatChatModel.getValueAt(i, j);
+                }
+                exportRows.add(row);
+            }
+        }
+
+        // Generate keyword → value cho từng ô trong 80 hàng × 28 cột
+        for (int wordRow = 1; wordRow <= WORD_MAX_ROWS; wordRow++) {
+            boolean hasData = wordRow <= exportRows.size();
+            Object[] uiRow = hasData ? exportRows.get(wordRow - 1) : null;
+
+            for (int wordCell = 0; wordCell < WORD_CELLS; wordCell++) {
+                String key = "{{" + prefix + "_r" + wordRow + "_c" + wordCell + "}}";
+                String val = "";
+
+                if (hasData) {
+                    if (wordCell == 0) {
+                        // STT = số thứ tự (1-based)
+                        val = String.valueOf(wordRow);
+                    } else {
+                        // wordCell 1..27 → UI col 0..26
+                        int uiCol = wordCell - 1;
+                        if (uiCol < UI_COLS) {
+                            val = vcCellStr(uiRow[uiCol]);
+                        }
+                    }
+                }
+                data.put(key, val);
+            }
+        }
         return data;
     }
 
-    private String buildTableHtml(DefaultTableModel m) {
-        if (m == null || m.getRowCount() == 0) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < m.getRowCount(); i++) {
-            sb.append("<tr>");
-            for (int j = 0; j < m.getColumnCount(); j++) {
-                Object val = m.getValueAt(i, j);
-                String text = (val == null) ? "" : val.toString().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-                if (j == 0) sb.append("<td class='text-left'>").append(text).append("</td>");
-                else sb.append("<td>").append(text).append("</td>");
-            }
-            sb.append("</tr>");
-        }
-        return sb.toString();
+    /** Chuyển giá trị ô model sang String an toàn. Strip HTML tags. Bỏ "-". */
+    private static String vcCellStr(Object o) {
+        if (o == null) return "";
+        String s = o.toString().trim();
+        // Strip HTML tags (header rows dùng <html><b>...</b></html>)
+        s = s.replaceAll("<[^>]+>", "").trim();
+        return "-".equals(s) ? "" : s;
     }
 }

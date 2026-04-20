@@ -41,7 +41,7 @@ public class Tab4_EquipPlanPanelUI extends JPanel {
         mainContainer.setBackground(Color.WHITE);
         mainContainer.setBorder(new EmptyBorder(20, 30, 20, 30));
 
-        JLabel lblTitle = new JLabel("IV. BẢO ĐẢM TRANG BỊ KỸ THUẬT");
+        JLabel lblTitle = new JLabel("IV. BẢO ĐẢM VŨ KHÍ TRANG BỊ KỸ THUẬT");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         lblTitle.setForeground(AssurancePlanUiUtils.SLATE_TEXT);
         lblTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -55,7 +55,7 @@ public class Tab4_EquipPlanPanelUI extends JPanel {
         mainContainer.add(Box.createVerticalStrut(25));
 
         // 2. Ý định, biện pháp
-        mainContainer.add(UIUtils.createSectionLabel("2. Ý định, biện pháp bảo đảm"));
+        mainContainer.add(UIUtils.createSectionLabel("2.biện pháp bảo đảm"));
         mainContainer.add(Box.createVerticalStrut(10));
 
         mainContainer.add(UIUtils.createSubSectionLabel("Giai đoạn chuẩn bị:"));

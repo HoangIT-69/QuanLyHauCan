@@ -38,7 +38,7 @@ public class Tab8_MaintPlanPanelService {
                 else if (tenVK.contains("82")) rowIndex = 4;
                 else if (tenVK.contains("60")) rowIndex = 5;
                 else if (tenVK.contains("spg")) rowIndex = 6;
-                else if (tenVK.contains("b41") || rawTen.contains("M79")) rowIndex = 7;
+                else if (tenVK.contains("b41")) rowIndex = 7;
                 else if (tenVK.contains("đại liên") || rawTen.contains("Đại liên")) rowIndex = 8;
                 else if (tenVK.contains("trung liên") || rawTen.contains("Trung liên")) rowIndex = 9;
                 else if (tenVK.contains("tiểu liên") || rawTen.contains("Tiểu liên")) rowIndex = 10;

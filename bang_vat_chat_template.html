@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Bảng Vật Chất Hậu Cần - Template 80 dòng</title>
+<style>
+  body { font-family: "Times New Roman", serif; font-size: 11pt; }
+  table { border-collapse: collapse; width: 100%; font-size: 10pt; }
+  th, td {
+    border: 1px solid #000;
+    padding: 2px 4px;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  td.left { text-align: left; }
+  th { background: #d0d8e4; font-weight: bold; }
+  tr.data td { height: 20px; min-width: 40px; }
+  /* Highlight keyword cells for visibility */
+  td.kw { font-size: 7pt; color: #666; background: #fafafa; }
+</style>
+</head>
+<body>
+<p><strong>b. Vật chất hậu cần</strong></p>
+<p><em>Hướng dẫn: Copy bảng này vào Word, thay thế nội dung trong bảng bằng keyword tương ứng, hoặc để nguyên keyword - Java sẽ tự điền.</em></p>
+
+<table>
+  <!-- ===== HEADER TẦNG 1 ===== -->
+  <tr>
+    <th rowspan="3">TT</th>
+    <th rowspan="3" style="min-width:120px">Chỉ tiêu</th>
+    <th rowspan="3">ĐVT</th>
+    <th rowspan="3">TL ĐVT<br>(Toàn d)</th>
+    <th rowspan="3">TL ĐVT<br>(d)</th>
+    <th rowspan="3">TL ĐVT<br>(PT)</th>
+    <th colspan="6">Quy định dự trữ, tiêu thụ</th>
+    <th colspan="5">Hiện có</th>
+    <th colspan="2">PC TQĐ</th>
+    <th colspan="5">Bổ sung</th>
+    <th colspan="4">Kế hoạch tiếp nhận, bảo đảm</th>
+  </tr>
+  <!-- HEADER TẦNG 2 -->
+  <tr>
+    <th rowspan="2">Quy định<br>dự trữ</th>
+    <th colspan="2">Tiêu thụ</th>
+    <th colspan="3">PC SCĐ</th>
+    <th colspan="2">Kho/d</th>
+    <th colspan="2">ĐV</th>
+    <th rowspan="2">+</th>
+    <th rowspan="2">Kho/d</th>
+    <th rowspan="2">ĐV</th>
+    <th colspan="2">GĐCB</th>
+    <th colspan="2">GĐCĐ</th>
+    <th rowspan="2">+</th>
+    <th rowspan="2">Thời gian</th>
+    <th rowspan="2">Địa điểm</th>
+    <th rowspan="2">Phương thức</th>
+    <th rowspan="2">Nhiệm vụ</th>
+  </tr>
+  <!-- HEADER TẦNG 3 -->
+  <tr>
+    <th>GĐCB</th>
+    <th>GĐCĐ</th>
+    <th>Kho/d</th>
+    <th>ĐV</th>
+    <th>+</th>
+    <th>d</th>
+    <th>PT</th>
+    <th>d</th>
+    <th>PT</th>
+    <th>Kho/d</th>
+    <th>ĐV</th>
+    <th>Kho/d</th>
+    <th>ĐV</th>
+  </tr>
+  <!-- ===== 80 DÒNG DỮ LIỆU ===== -->
+  <!-- Keyword pattern: {{vc_r{row}_c{col}}} với row=1..80, col=0..27 -->
+  <!-- col mapping: 0=TT, 1=ChiTieu, 2=DVT, 3=TLToanD, 4=TLd, 5=TLPT,
+       6=QDDT, 7=TTGDCB, 8=TTGDCD, 9=PCKho, 10=PCDV, 11=PC+,
+       12=HCKhoD, 13=HCKhoPT, 14=HCDVd, 15=HCDVPT, 16=HC+,
+       17=PCTQDKho, 18=PCTQDDv, 19=BSGDCBKho, 20=BSGDCBDv,
+       21=BSGDCDKho, 22=BSGDCDDv, 23=BS+, 24=KHTime, 25=KHPlace,
+       26=KHMethod, 27=KHTask -->
+</table>
+
+<hr>
+<h3>Bảng keyword đầy đủ (80 dòng × 28 cột = 2240 keywords)</h3>
+<table id="kw-table">
+  <thead>
+    <tr>
+      <th>Dòng</th>
+      <th>c0 (TT)</th>
+      <th>c1 (Chỉ tiêu)</th>
+      <th>c2 (ĐVT)</th>
+      <th>c3 (TL Toàn d)</th>
+      <th>c4 (TL d)</th>
+      <th>c5 (TL PT)</th>
+      <th>c6 (QDDT)</th>
+      <th>c7 (TT GĐCB)</th>
+      <th>c8 (TT GĐCĐ)</th>
+      <th>c9 (PC Kho)</th>
+      <th>c10 (PC ĐV)</th>
+      <th>c11 (PC +)</th>
+      <th>c12 (HC Kho d)</th>
+      <th>c13 (HC Kho PT)</th>
+      <th>c14 (HC ĐV d)</th>
+      <th>c15 (HC ĐV PT)</th>
+      <th>c16 (HC +)</th>
+      <th>c17 (PC TQĐ Kho)</th>
+      <th>c18 (PC TQĐ ĐV)</th>
+      <th>c19 (BS GĐCB Kho)</th>
+      <th>c20 (BS GĐCB ĐV)</th>
+      <th>c21 (BS GĐCĐ Kho)</th>
+      <th>c22 (BS GĐCĐ ĐV)</th>
+      <th>c23 (BS +)</th>
+      <th>c24 (KH Thời gian)</th>
+      <th>c25 (KH Địa điểm)</th>
+      <th>c26 (KH Phương thức)</th>
+      <th>c27 (KH Nhiệm vụ)</th>
+    </tr>
+  </thead>
+  <tbody id="kw-body">
+  </tbody>
+</table>
+
+<script>
+const tbody = document.getElementById('kw-body');
+for (let r = 1; r <= 80; r++) {
+  const tr = document.createElement('tr');
+  const tdRow = document.createElement('td');
+  tdRow.textContent = `Dòng ${r}`;
+  tr.appendChild(tdRow);
+  for (let c = 0; c <= 27; c++) {
+    const td = document.createElement('td');
+    td.className = 'kw';
+    td.textContent = `{{vc_r${r}_c${c}}}`;
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+}
+</script>
+
+<hr>
+<h3>Bảng Word thực tế cần tạo (copy nội dung này vào Word)</h3>
+<p>
+  Bảng bên dưới là bảng 28 cột × (3 hàng header + 80 hàng dữ liệu).
+  Mỗi ô dữ liệu chứa keyword tương ứng.<br>
+  <strong>Copy bảng này → paste vào Word tại vị trí {{rows_bang_vat_chat_hc}}</strong>
+</p>
+
+<table id="word-table" style="font-size:8pt">
+  <!-- 3 header rows giống trên -->
+  <tr>
+    <th rowspan="3">TT</th>
+    <th rowspan="3">Chỉ tiêu</th>
+    <th rowspan="3">ĐVT</th>
+    <th rowspan="3">TL Toàn d</th>
+    <th rowspan="3">TL d</th>
+    <th rowspan="3">TL PT</th>
+    <th colspan="6">Quy định dự trữ, tiêu thụ</th>
+    <th colspan="5">Hiện có</th>
+    <th colspan="2">PC TQĐ</th>
+    <th colspan="5">Bổ sung</th>
+    <th colspan="4">KH tiếp nhận, bảo đảm</th>
+  </tr>
+  <tr>
+    <th rowspan="2">QDDT</th>
+    <th colspan="2">Tiêu thụ</th>
+    <th colspan="3">PC SCĐ</th>
+    <th colspan="2">Kho/d</th>
+    <th colspan="2">ĐV</th>
+    <th rowspan="2">+</th>
+    <th rowspan="2">Kho/d</th>
+    <th rowspan="2">ĐV</th>
+    <th colspan="2">GĐCB</th>
+    <th colspan="2">GĐCĐ</th>
+    <th rowspan="2">+</th>
+    <th rowspan="2">Thời gian</th>
+    <th rowspan="2">Địa điểm</th>
+    <th rowspan="2">Phương thức</th>
+    <th rowspan="2">Nhiệm vụ</th>
+  </tr>
+  <tr>
+    <th>GĐCB</th><th>GĐCĐ</th>
+    <th>Kho</th><th>ĐV</th><th>+</th>
+    <th>d</th><th>PT</th>
+    <th>d</th><th>PT</th>
+    <th>Kho</th><th>ĐV</th>
+    <th>Kho</th><th>ĐV</th>
+  </tr>
+  <!-- 80 data rows with keywords -->
+  <tbody id="word-body"></tbody>
+</table>
+
+<script>
+const wordBody = document.getElementById('word-body');
+for (let r = 1; r <= 80; r++) {
+  const tr = document.createElement('tr');
+  tr.className = 'data';
+  for (let c = 0; c <= 27; c++) {
+    const td = document.createElement('td');
+    if (c === 1) td.className = 'left';
+    td.textContent = `{{vc_r${r}_c${c}}}`;
+    td.style.fontSize = '7pt';
+    td.style.color = '#444';
+    tr.appendChild(td);
+  }
+  wordBody.appendChild(tr);
+}
+</script>
+
+</body>
+</html>

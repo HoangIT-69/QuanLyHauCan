@@ -20,7 +20,7 @@ public class Tab4_EquipmentPanelUI extends JPanel {
         setBackground(Color.WHITE);
         setBorder(new EmptyBorder(20, 30, 20, 30));
 
-        JLabel lblTitle = new JLabel("IV. BẢO ĐẢM TRANG BỊ KỸ THUẬT");
+        JLabel lblTitle = new JLabel("IV. BẢO ĐẢM VŨ KHÍ TRANG BỊ KỸ THUẬT");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         lblTitle.setForeground(new Color(30, 41, 59));
         add(lblTitle, BorderLayout.NORTH);

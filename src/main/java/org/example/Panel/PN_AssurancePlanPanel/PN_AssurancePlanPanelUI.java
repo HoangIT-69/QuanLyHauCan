@@ -5,7 +5,7 @@ import org.example.Tab.AssurancePlan.Tab4_EquipPlanPanel.Tab4_EquipPlanPanelUI;
 import org.example.Tab.AssurancePlan.Tab5_MaterialPlanPanel.Tab5_MaterialPanelUI;
 import org.example.Tab.AssurancePlan.Tab7_MedPlanPanel.Tab7_MedPlanPanelUI;
 import org.example.Tab.AssurancePlan.Tab8_MaintPlanPanel.Tab8_MaintPlanPanelUI;
-import org.example.Tab.AssurancePlan.Tab9_TransportPanel;
+import org.example.Tab.AssurancePlan.Tav9_TransportPanel.Tab9_TransportPanel;
 import org.example.Tab.PlanEstimation.Tab1_EvaluationPanel.Tab1_EvaluationPanelService;
 import org.example.Tab.PlanEstimation.Tab1_EvaluationPanel.Tab1_EvaluationPanelUI;
 import org.example.Tab.PlanEstimation.Tab2_MissionPanel.Tab2_MissionPanelService;
@@ -133,7 +133,7 @@ public class PN_AssurancePlanPanelUI extends JPanel {
 
         tab4 = new Tab4_EquipPlanPanelUI();
         tab4.loadDataFromDatabase(this.sessionId);
-        addTab("IV. Bảo đảm trang bị kĩ thuật", "tab4", tab4);
+        addTab("IV. Bảo đảm vũ khí trang bị kỹ thuật", "tab4", tab4);
 
         tab5 = new Tab5_MaterialPanelUI();
         tab5.loadSessionData(this.sessionId);
@@ -155,7 +155,7 @@ public class PN_AssurancePlanPanelUI extends JPanel {
         tab8.loadDataFromDatabase(this.sessionId);
         addTab("VIII. Bảo dưỡng, sửa chữa", "tab8", tab8);
 
-        tab9 = new Tab9_TransportPanel();
+        tab9 = new Tab9_TransportPanel(this.sessionId);
         addTab("IX. Công tác vận tải", "tab9", tab9);
 
         tab10 = new Tab10_ProtectionPanelUI();
@@ -192,6 +192,15 @@ public class PN_AssurancePlanPanelUI extends JPanel {
         return pnlFooter;
     }
 
+    private String buildAssuranceFileName() {
+        String nguoiLap = org.example.Utils.AppSession.getFullName();
+        if (nguoiLap.isBlank()) {
+            return "Ke_hoach_BaoDam.docx";
+        }
+        String namePart = nguoiLap.trim().replaceAll("[\\\\/:*?\"<>|]", "").replace(" ", "_");
+        return "Ke_hoach_cua_" + namePart + ".docx";
+    }
+
     private void performExport() {
         Map<String, String> dataMap = collectExportData();
 
@@ -206,7 +215,7 @@ public class PN_AssurancePlanPanelUI extends JPanel {
             return;
         }
 
-        String outputPath = ExportWord.chooseSaveDocxPath(this, "KeHoachBaoDam_HoanChinh.docx");
+        String outputPath = ExportWord.chooseSaveDocxPath(this, buildAssuranceFileName());
         if (outputPath == null) return;
 
         try {
@@ -302,6 +311,10 @@ public class PN_AssurancePlanPanelUI extends JPanel {
             btn.setForeground(new Color(41, 128, 185));
 
             cardLayout.show(contentPanel, cardId);
+            // CardLayout.show() không trigger setVisible() nên phải gọi refresh thủ công
+            if ("tab9".equals(cardId) && tab9 != null) {
+                tab9.refreshData();
+            }
         });
 
         menuPanel.add(btn);

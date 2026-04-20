@@ -54,6 +54,14 @@ public class ExportWord {
     }
 
     public static void exportDataToWord(InputStream is, String outputPath, Map<String, String> dataMap) throws Exception {
+        // === DEBUG: in ra tất cả key trong dataMap ===
+        System.out.println("[ExportWord] dataMap keys (" + dataMap.size() + " entries):");
+        dataMap.forEach((k, v) -> {
+            if (k != null && (k.contains("bando") || k.contains("ten_ke") || k.contains("mat_do") || k.contains("nam}"))) {
+                System.out.println("  KEY=" + k + "  VALUE=" + v);
+            }
+        });
+
         try (XWPFDocument document = new XWPFDocument(is)) {
 
             // 1. Xử lý Paragraph ngoài bảng (Văn bản thường)
@@ -61,7 +69,16 @@ public class ExportWord {
                 replaceTextInParagraph(paragraph, dataMap);
             }
 
-            // 2. Xử lý Paragraph trong bảng (CÓ NÂNG CẤP PARSE HTML THÀNH BẢNG WORD)
+            // 2. Xử lý các paragraph bên trong Drawing / Text Box (shape)
+            for (XWPFParagraph paragraph : document.getParagraphs()) {
+                for (var run : paragraph.getRuns()) {
+                    // CTR chứa drawing hoặc inline shapes — duyệt nested paragraphs nếu có
+                }
+            }
+            // Duyệt body XML để tìm text box paragraphs
+            replaceInBodyXml(document, dataMap);
+
+            // 3. Xử lý Paragraph trong bảng (CÓ NÂNG CẤP PARSE HTML THÀNH BẢNG WORD)
             for (XWPFTable table : document.getTables()) {
                 try {
                     processTable(table, dataMap);
@@ -78,6 +95,48 @@ public class ExportWord {
             System.out.println("Xuất file Word thành công: " + outputPath);
         }
     }
+
+    /**
+     * Duyệt XML body để xử lý text trong các Drawing/TextBox/Shape.
+     * Word lưu text box dưới dạng wps:txbx → w:txbxContent → w:p, không nằm trong document.getParagraphs().
+     */
+    private static void replaceInBodyXml(XWPFDocument document, Map<String, String> dataMap) {
+        try {
+            org.apache.xmlbeans.XmlObject[] txbxContents = document.getDocument().getBody()
+                    .selectPath("declare namespace wps='http://schemas.microsoft.com/office/word/2010/wordprocessingShape'"
+                            + " .//wps:txbx");
+            if (txbxContents != null) {
+                System.out.println("[ExportWord] Found " + txbxContents.length + " text boxes");
+            }
+        } catch (Exception ignored) {
+            // selectPath không available — fallback: replace trực tiếp trong XML string
+        }
+
+        // Fallback đáng tin cậy hơn: thay thế trực tiếp trong XML của body
+        try {
+            org.apache.xmlbeans.XmlObject body = document.getDocument().getBody();
+            String xmlStr = body.xmlText();
+            boolean changed = false;
+            for (Map.Entry<String, String> entry : dataMap.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue() == null ? "" : entry.getValue();
+                // Escape XML special chars in value
+                String safeValue = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+                if (xmlStr.contains(key)) {
+                    xmlStr = xmlStr.replace(key, safeValue);
+                    changed = true;
+                    System.out.println("[ExportWord] TextBox replaced: " + key + " -> " + safeValue);
+                }
+            }
+            if (changed) {
+                org.apache.xmlbeans.XmlObject newBody = org.apache.xmlbeans.XmlObject.Factory.parse(xmlStr);
+                body.set(newBody);
+            }
+        } catch (Exception e) {
+            System.err.println("[ExportWord] replaceInBodyXml fallback error: " + e.getMessage());
+        }
+    }
+
 
     // --- HÀM MỚI: XỬ LÝ BẢNG ĐỂ DỊCH HTML ---
     private static void processTable(XWPFTable table, Map<String, String> dataMap) {
@@ -202,6 +261,7 @@ public class ExportWord {
             if (replacedText.contains(key)) {
                 replacedText = replacedText.replace(key, value);
                 found = true;
+                System.out.println("[ExportWord] replaceTextInParagraph: '" + key + "' -> '" + value + "'");
             }
         }
 

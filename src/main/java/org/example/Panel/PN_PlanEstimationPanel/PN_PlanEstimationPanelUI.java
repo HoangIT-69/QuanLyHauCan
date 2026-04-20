@@ -67,6 +67,7 @@ public class PN_PlanEstimationPanelUI extends JPanel {
         setBorder(new EmptyBorder(10, 10, 10, 10));
 
         String titleText = panelService.fetchTenVanKien(sessionId);
+        String chiHuy = org.example.Utils.AppSession.getFullName();
 
         JLabel lblTitle = new JLabel(titleText, SwingConstants.CENTER);
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
@@ -77,7 +78,7 @@ public class PN_PlanEstimationPanelUI extends JPanel {
         Tab2_MissionPanelService tab2Svc = new Tab2_MissionPanelService();
 
         initTabs(tab1Svc, tab2Svc);
-        add(createFooterPanel(titleText), BorderLayout.SOUTH);
+        add(createFooterPanel(titleText, chiHuy), BorderLayout.SOUTH);
 
         if (menuPanel.getComponentCount() > 0) {
             ((JButton) menuPanel.getComponent(0)).doClick();
@@ -94,14 +95,14 @@ public class PN_PlanEstimationPanelUI extends JPanel {
         tab3 = new Tab3_OrganizationPanelUI(sessionId, new Tab3_OrganizationPanelService());
         addTab("III. Tổ chức, Bố trí", "tab3", tab3);
         tab4 = new Tab4_EquipmentPanelUI(sessionId, new Tab4_EquipmentPanelService());
-        addTab("IV. Trang bị kỹ thuật", "tab4", tab4);
+        addTab("IV. Bảo đảm vũ khí trang bị kỹ thuật", "tab4", tab4);
         tab5 = new Tab5_MaterialPanelUI(sessionId, new Tab5_MaterialPanelService());
         addTab("V. Đạn, Vật chất", "tab5", tab5);
         tab6 = new Tab6_LivingPanelUI(sessionId, new Tab6_LivingPanelService());
         addTab("VI. Sinh hoạt", "tab6", tab6);
         tab7 = new Tab7_MedicalPanelUI(sessionId, new Tab7_MedicalPanelService());
         addTab("VII. Quân y", "tab7", tab7);
-        tab8 = new Tab8_MaintenancePanelUI();
+        tab8 = new Tab8_MaintenancePanelUI(sessionId);
         addTab("VIII. Bảo dưỡng, Sửa chữa", "tab8", tab8);
         tab9 = new Tab9_TransportPanelUI(sessionId, new Tab9_TransportPanelService());
         addTab("IX. Công tác Vận tải", "tab9", tab9);
@@ -110,10 +111,10 @@ public class PN_PlanEstimationPanelUI extends JPanel {
         tab11 = new Tab11_CommandPanelUI(sessionId, new Tab11_CommandPanelService());
         addTab("XI. Chỉ huy HC-KT", "tab11", tab11);
         tab12 = new Tab12_ConclusionPanelUI(sessionId, new Tab12_ConclusionPanelService());
-        addTab("XII. Kết luận & Đề nghị", "tab12", tab12);
+        addTab("*Kết luận & Đề nghị", "tab12", tab12);
     }
 
-    private JPanel createFooterPanel(String titleText) {
+    private JPanel createFooterPanel(String titleText, String chiHuy) {
         JPanel pnlFooter = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         pnlFooter.setOpaque(false);
 
@@ -136,14 +137,14 @@ public class PN_PlanEstimationPanelUI extends JPanel {
                     JOptionPane.INFORMATION_MESSAGE);
         });
 
-        btnExport.addActionListener(e -> performExport(titleText));
+        btnExport.addActionListener(e -> performExport(titleText, chiHuy));
 
         pnlFooter.add(btnSave);
         pnlFooter.add(btnExport);
         return pnlFooter;
     }
 
-    private void performExport(String titleText) {
+    private void performExport(String titleText, String chiHuy) {
         Map<String, String> dataMap = collectExportData(titleText);
 
         java.io.InputStream templateStream = getClass().getResourceAsStream("/docs/template-PN_DKKH.docx");
@@ -157,10 +158,12 @@ public class PN_PlanEstimationPanelUI extends JPanel {
             return;
         }
 
-        String outputPath = ExportWord.chooseSaveDocxPath(
-                this,
-                "Ket_Qua_Export_Session_" + sessionId + ".docx"
-        );
+        String namePart = (chiHuy != null && !chiHuy.isBlank())
+                ? chiHuy.replaceAll("[\\\\/:*?\"<>|]", "").replace(" ", "_")
+                : "Session_" + sessionId;
+        String defaultFileName = "Du_kien_KH_cua_" + namePart + ".docx";
+
+        String outputPath = ExportWord.chooseSaveDocxPath(this, defaultFileName);
 
         if (outputPath == null) {
             return;

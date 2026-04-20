@@ -39,7 +39,8 @@ public class TotalDataEntryDialogService {
                         String nhom = rs.getString("nhom_don_vi");
 
                         if (nhom.equalsIgnoreCase(filterGroup)
-                                || (filterGroup.equals("Tiểu đoàn") && nhom.contains("Tiểu đoàn"))) {
+                                || (filterGroup.equals("Tiểu đoàn") && nhom.contains("Tiểu đoàn"))
+                                || (filterGroup.equals("Trung đoàn") && nhom.contains("đoàn") && !nhom.contains("Tiểu"))) {
                             Object[] row = new Object[15];
                             row[0] = "[" + nhom + "] " + rs.getString("ten_don_vi");
                             row[1] = rs.getInt("quan_so");
@@ -98,7 +99,8 @@ public class TotalDataEntryDialogService {
             return false;
         }
         return nhom.equalsIgnoreCase(filterGroup)
-                || ("Tiểu đoàn".equals(filterGroup) && nhom.contains("Tiểu đoàn"));
+                || ("Tiểu đoàn".equals(filterGroup) && nhom.contains("Tiểu đoàn"))
+                || ("Trung đoàn".equals(filterGroup) && nhom.contains("đoàn") && !nhom.contains("Tiểu"));
     }
 
     private List<Object[]> extractRowsForFilter(Vector<Vector<Object>> rows, String filterGroup) {

@@ -30,7 +30,7 @@ public final class RegulationDetailDialogService {
     }
 
     public static int phanCapFieldCount(String hinhThucTapBai) {
-        return isPhongNgu(hinhThucTapBai) ? 5 : 6;
+        return isPhongNgu(hinhThucTapBai) ? 6 : 6;
     }
 
     public static String[] phanCapLabels(String hinhThucTapBai) {
@@ -40,7 +40,8 @@ public final class RegulationDetailDialogService {
                     "Hướng thứ yếu",
                     "Lực lượng chiến đấu vòng ngoài",
                     "Lực lượng dự bị cơ động",
-                    "Lực lượng còn lại"
+                    "Lực lượng còn lại",
+                    "Hướng PN phía sau"
             };
         }
         return new String[]{

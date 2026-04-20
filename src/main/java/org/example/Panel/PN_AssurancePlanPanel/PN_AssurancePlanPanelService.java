@@ -36,14 +36,42 @@ public class PN_AssurancePlanPanelService {
                     title = "KẾ HOẠCH BẢO ĐẢM HẬU CẦN, KỸ THUẬT " + tenVK.toUpperCase();
                 }
 
-                thongTinChungData.put("{{nguoi_phe_chuan}}", rs.getString("chi_huy"));
-                thongTinChungData.put("{{toa_do}}", "VTCH: " + rs.getString("vi_tri_chi_huy") + " " + rs.getString("thoi_gian"));
-                thongTinChungData.put("{{ban_do_su_dung}}", "Bản đồ tỷ lệ " + rs.getString("ty_le") + " BTTM in năm " + rs.getString("nam"));
+                thongTinChungData.put("{{ten_ke_hoach}}", tenVK);
+                thongTinChungData.put("{{vi_tri_thoi_gian}}", rs.getString("vi_tri_chi_huy") + " " + rs.getString("thoi_gian"));
+                
+                thongTinChungData.put("{{bando_tyle}}", rs.getString("ty_le"));
+                thongTinChungData.put("{{nam}}", String.valueOf(rs.getInt("nam")));
+
+                thongTinChungData.put("{{bando_1}}", rs.getString("map_1"));
+                thongTinChungData.put("{{bando_2}}", rs.getString("map_2"));
+                thongTinChungData.put("{{bando_3}}", rs.getString("map_3"));
+                thongTinChungData.put("{{bando_4}}", rs.getString("map_4"));
+
+                // Các biến thể khác để đề phòng
+                thongTinChungData.put("{{bando1}}", rs.getString("map_1"));
+                thongTinChungData.put("{{bando2}}", rs.getString("map_2"));
+                thongTinChungData.put("{{bando3}}", rs.getString("map_3"));
+                thongTinChungData.put("{{bando4}}", rs.getString("map_4"));
+
+                thongTinChungData.put("{{BANDO_1}}", rs.getString("map_1"));
+                thongTinChungData.put("{{BANDO_2}}", rs.getString("map_2"));
+                thongTinChungData.put("{{BANDO_3}}", rs.getString("map_3"));
+                thongTinChungData.put("{{BANDO_4}}", rs.getString("map_4"));
 
                 thongTinChungData.put("{{map_1}}", rs.getString("map_1"));
                 thongTinChungData.put("{{map_2}}", rs.getString("map_2"));
                 thongTinChungData.put("{{map_3}}", rs.getString("map_3"));
                 thongTinChungData.put("{{map_4}}", rs.getString("map_4"));
+
+                // Biến thể có khoảng trắng {{ bando_1 }}
+                thongTinChungData.put("{{ bando_1 }}", rs.getString("map_1"));
+                thongTinChungData.put("{{ bando_2 }}", rs.getString("map_2"));
+                thongTinChungData.put("{{ bando_3 }}", rs.getString("map_3"));
+                thongTinChungData.put("{{ bando_4 }}", rs.getString("map_4"));
+                
+                // Các key cũ/phụ trợ
+                thongTinChungData.put("{{toa_do}}", "VTCH: " + rs.getString("vi_tri_chi_huy") + " " + rs.getString("thoi_gian"));
+                thongTinChungData.put("{{nguoi_lap}}", rs.getString("chi_huy"));
             }
         } catch (Exception e) {
             System.err.println("Lỗi lấy thông tin chung: " + e.getMessage());

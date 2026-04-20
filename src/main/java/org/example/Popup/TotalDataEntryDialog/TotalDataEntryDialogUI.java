@@ -46,7 +46,7 @@ public class TotalDataEntryDialogUI extends JDialog {
 
         String titleText = filterGroup.equals("Tiểu đoàn")
                 ? "BẢNG TỔNG HỢP BIÊN CHẾ NỘI BỘ TIỂU ĐOÀN"
-                : "BẢNG TỔNG HỢP LỰC LƯỢNG PHỐI THUỘC (TRUNG ĐOÀN)";
+                : "BẢNG TỔNG HỢP LỰC LƯỢNG PHỐI THUỘC (TRUNG ĐOÀN + SƯ ĐOÀN)";
         JLabel lblMainTitle = new JLabel(titleText, SwingConstants.CENTER);
         lblMainTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
         north.add(lblMainTitle);
@@ -65,7 +65,7 @@ public class TotalDataEntryDialogUI extends JDialog {
 
         container.add(north, BorderLayout.NORTH);
 
-        String[] columnNames = {"LỰC LƯỢNG", "QUÂN SỐ", "SN", "TL", "TrL", "ĐL", "B41, M79", "Lựu đạn", "60", "82", "100", "SPG9", "12.7", "ON", "ĐB"};
+        String[] columnNames = {"LỰC LƯỢNG", "QUÂN SỐ", "SN", "TL", "TrL", "ĐL", "B41", "Lựu đạn", "60", "82", "100", "SPG9", "12.7", "ON", "ĐB"};
         model = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {

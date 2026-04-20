@@ -6,7 +6,6 @@ import org.example.Utils.UIUtils;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
-import javax.swing.event.TableModelEvent;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.ArrayList;
@@ -15,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 
 public class Tab8_MaintenancePanelUI extends JPanel {
+
+    private final Tab8_MaintenancePanelService service = new Tab8_MaintenancePanelService();
+    private int currentSessionId = -1;
 
     private JTextArea txtBDChuanBi;
     private JTextArea txtBDChienDau;
@@ -26,7 +28,12 @@ public class Tab8_MaintenancePanelUI extends JPanel {
 
     private DefaultTableModel model;
     private JTable table;
-    private boolean isUpdatingTable = false;
+
+    public Tab8_MaintenancePanelUI(int sessionId) {
+        this();
+        this.currentSessionId = sessionId;
+        loadDataFromDatabase(sessionId);
+    }
 
     public Tab8_MaintenancePanelUI() {
         setLayout(new BorderLayout());
@@ -89,6 +96,39 @@ public class Tab8_MaintenancePanelUI extends JPanel {
         add(mainScroll, BorderLayout.CENTER);
     }
 
+    /**
+     * Nạp số lượng vũ khí và tỉ lệ hư hỏng đã khai báo từ DB vào bảng 2a (tự động, không nhập tay).
+     */
+    public void loadDataFromDatabase(int sessionId) {
+        this.currentSessionId = sessionId;
+        Map<String, Integer> sums = (sessionId > 0)
+                ? service.fetchWeaponSums(sessionId)
+                : service.fetchWeaponSumsFromSharedStep2Store();
+        Map<String, Double> savedRates = service.fetchSavedRates(sessionId);
+
+        String[][] weapons = {
+            {"1",  "Súng ngắn",       "sung_ngan"},
+            {"2",  "Súng Tiểu liên",  "tieu_lien"},
+            {"3",  "Súng Trung liên", "trung_lien"},
+            {"4",  "Súng Đại liên",  "dai_lien"},
+            {"5",  "B41",              "b41"},
+            {"6",  "Cối 60mm",        "co60mm"},
+            {"7",  "Cối 82mm",        "co82mm"},
+            {"8",  "Cối 100mm",       "co100mm"},
+            {"9",  "SPG-9",            "spg9"},
+            {"10", "SMPK 12,7",       "smpk_127mm"}
+        };
+
+        model.setRowCount(0);
+        for (String[] w : weapons) {
+            int soLuong = sums.getOrDefault(w[2], 0);
+            double tiLe = savedRates.getOrDefault(w[1].trim().toLowerCase(), 0.0);
+            String strRate = (tiLe == (long) tiLe) ? String.valueOf((long) tiLe) : String.valueOf(tiLe);
+            int huHong = (int) Math.ceil((soLuong * tiLe) / 100.0);
+            model.addRow(new Object[]{w[0], w[1], soLuong, strRate, String.valueOf(huHong)});
+        }
+    }
+
     public Map<String, String> getMaintenanceTextData() {
         Map<String, String> data = new HashMap<>();
         data.put("<<bd_kt_cb>>", txtBDChuanBi.getText().trim());
@@ -117,22 +157,14 @@ public class Tab8_MaintenancePanelUI extends JPanel {
         JPanel pnl = new JPanel(new BorderLayout(0, 5));
         pnl.setBackground(Color.WHITE);
         pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
-        pnl.setPreferredSize(new Dimension(800, 250));
-        pnl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 250));
-
-        JPanel pnlControls = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        pnlControls.setBackground(Color.WHITE);
-        JButton btnAdd = UIUtils.createStyledButton("➕ Thêm vũ khí", new Color(41, 128, 185));
-        JButton btnDel = UIUtils.createStyledButton("➖ Xóa", new Color(231, 76, 60));
-        pnlControls.add(btnAdd);
-        pnlControls.add(btnDel);
-        pnl.add(pnlControls, BorderLayout.NORTH);
+        pnl.setPreferredSize(new Dimension(800, 310));
+        pnl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 310));
 
         String[] cols = {"STT", "Loại vũ khí", "Số lượng", "Tỉ lệ hư hỏng (%)", "Số vũ khí hư hỏng"};
         model = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column != 4;
+                return false;
             }
         };
         table = new JTable(model);
@@ -140,38 +172,10 @@ public class Tab8_MaintenancePanelUI extends JPanel {
         table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
         table.getTableHeader().setBackground(new Color(241, 245, 249));
 
-        model.addTableModelListener(e -> {
-            if (!isUpdatingTable && e.getType() == TableModelEvent.UPDATE && (e.getColumn() == 2 || e.getColumn() == 3)) {
-                isUpdatingTable = true;
-                int r = e.getFirstRow();
-                double soLuong = InputValidator.parseDoubleSafe(model.getValueAt(r, 2));
-                double tiLe = InputValidator.parseDoubleSafe(model.getValueAt(r, 3));
-                int huHong = (int) Math.ceil((soLuong * tiLe) / 100.0);
-                model.setValueAt(String.valueOf(huHong), r, 4);
-                isUpdatingTable = false;
-            }
-        });
-
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(new LineBorder(new Color(203, 213, 225), 1));
         UIUtils.makeScrollPassThrough(scroll);
         pnl.add(scroll, BorderLayout.CENTER);
-
-        btnAdd.addActionListener(e -> {
-            if (model.getRowCount() >= 10) {
-                JOptionPane.showMessageDialog(this, "Tối đa 10 dòng để phù hợp mẫu Word.");
-                return;
-            }
-            model.addRow(new Object[]{model.getRowCount() + 1, "", "0", "0", "0"});
-        });
-        btnDel.addActionListener(e -> {
-            if (table.getSelectedRow() != -1) {
-                model.removeRow(table.getSelectedRow());
-                for (int i = 0; i < model.getRowCount(); i++) {
-                    model.setValueAt(i + 1, i, 0);
-                }
-            }
-        });
 
         return pnl;
     }

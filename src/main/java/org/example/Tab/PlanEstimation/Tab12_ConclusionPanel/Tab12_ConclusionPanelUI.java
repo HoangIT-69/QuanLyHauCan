@@ -28,18 +28,18 @@ public class Tab12_ConclusionPanelUI extends JPanel {
         mainContainer.setBackground(Color.WHITE);
         mainContainer.setBorder(new EmptyBorder(20, 30, 20, 30));
 
-        JLabel lblTitle = new JLabel("XII. KẾT LUẬN VÀ ĐỀ NGHỊ");
+        JLabel lblTitle = new JLabel("KẾT LUẬN VÀ ĐỀ NGHỊ");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         lblTitle.setForeground(new Color(30, 41, 59));
         mainContainer.add(lblTitle);
         mainContainer.add(Box.createVerticalStrut(25));
 
-        mainContainer.add(UIUtils.createSectionLabel("- Kết luận"));
+        mainContainer.add(UIUtils.createSectionLabel("Kết luận"));
         txtKetLuan = UIUtils.createStandardTextArea();
         mainContainer.add(UIUtils.createTextAreaScroll(txtKetLuan, 150));
         mainContainer.add(Box.createVerticalStrut(25));
 
-        mainContainer.add(UIUtils.createSectionLabel("- Đề nghị"));
+        mainContainer.add(UIUtils.createSectionLabel("Đề nghị"));
         txtDeNghi = UIUtils.createStandardTextArea();
         mainContainer.add(UIUtils.createTextAreaScroll(txtDeNghi, 150));
 
