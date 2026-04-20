@@ -49,6 +49,12 @@ public class Tab5_DanPanelService {
      */
     public static final Map<String, Map<String, Double>> miniTableToanD = new LinkedHashMap<>();
 
+    /**
+     * Dữ liệu KHTN chi tiết theo từng Hướng.
+     * Cấu trúc: Hướng -> (Tên loại đạn -> Map<TL_TRUOC_NO_..., Giá trị>)
+     */
+    public static final Map<String, Map<String, Map<String, Double>>> miniTableDanByDirection = new ConcurrentHashMap<>();
+
     private static final Object MINI_TABLE_LOCK = new Object();
 
     private static final String TOAN_D_HEADER = "Toàn d";
@@ -102,6 +108,12 @@ public class Tab5_DanPanelService {
     /** Cơ số định mức (2,4,6,8,9,17,18) theo hướng = nhau; Lựu đạn là ngoại lệ (số lượng thực tế theo chi tiết). */
     private static final String LUA_DAN_LABEL = "Lựu đạn";
 
+    /**
+     * Map tĩnh label hiển thị → {@code loai_dan} trong bảng {@code quyuoc_dan}.
+     * Dùng làm fallback khi step4 chưa có dữ liệu cho session.
+     */
+    private static final Map<String, String> LABEL_TO_DEFAULT_LOAI_DAN = new LinkedHashMap<>();
+
     static {
         LABEL_TO_BC_COLUMN.put("SMPK 12,7mm", "smpk_127mm");
         LABEL_TO_BC_COLUMN.put("Cối 100mm", "co100mm");
@@ -114,6 +126,18 @@ public class Tab5_DanPanelService {
         LABEL_TO_BC_COLUMN.put("Súng tiểu liên", "tieu_lien");
         LABEL_TO_BC_COLUMN.put("Súng ngắn", "sung_ngan");
         LABEL_TO_BC_COLUMN.put("Lựu đạn", "luu_dan");
+
+        LABEL_TO_DEFAULT_LOAI_DAN.put("SMPK 12,7mm",    "Đạn 12.7mm");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Cối 100mm",      "Đạn Cối 100mm");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Cối 82mm",       "Đạn Cối 82mm");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Cối 60mm",       "Đạn Cối 60mm");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Súng SPG-9",     "Đạn SPG-9");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Súng B41",       "Đạn B41");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Súng đại liên",  "Đạn 7.62mm");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Súng trung liên","Đạn 7.62mm");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Súng tiểu liên", "Đạn 7.62mm");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Súng ngắn",      "Đạn 9mm");
+        LABEL_TO_DEFAULT_LOAI_DAN.put("Lựu đạn",        "Lựu đạn mỏ vịt");
     }
 
     /**
@@ -135,16 +159,18 @@ public class Tab5_DanPanelService {
         };
 
         if (sessionId <= 0) {
-            globalTonnageData.clear();
             synchronized (MINI_TABLE_LOCK) {
+                globalTonnageData.clear();
                 miniTableToanD.clear();
+                miniTableDanByDirection.clear();
             }
             return model;
         }
 
-        globalTonnageData.clear();
         synchronized (MINI_TABLE_LOCK) {
+            globalTonnageData.clear();
             miniTableToanD.clear();
+            miniTableDanByDirection.clear();
         }
 
         Map<String, Map<String, Integer>> gunByHuong = loadGunCountsByHuong(sessionId);
@@ -161,6 +187,8 @@ public class Tab5_DanPanelService {
         ToanDAggregateOutcome toanDAgg = aggregateToanDLeaf(leafByHuong, step4Rows, quyUocDan);
         Map<String, Object[]> toanDLeaf = toanDAgg.displayRows();
         inheritCoSoFromToanDAndRecomputeDirections(leafByHuong, toanDAgg.mergedFullByLabel(), step4Rows, quyUocDan);
+        
+        populateMiniTableDanByDirection(leafByHuong);
 
         double tlDv = globalTonnageData.getOrDefault(TL_TRUOC_NO_DV, 0.0);
         double tlKho = globalTonnageData.getOrDefault(TL_TRUOC_NO_KHO, 0.0);
@@ -414,6 +442,20 @@ public class Tab5_DanPanelService {
             Map<String, Map<String, Double>> copy = new LinkedHashMap<>();
             for (Map.Entry<String, Map<String, Double>> e : miniTableToanD.entrySet()) {
                 copy.put(e.getKey(), Map.copyOf(e.getValue()));
+            }
+            return Collections.unmodifiableMap(copy);
+        }
+    }
+
+    public static Map<String, Map<String, Map<String, Double>>> getMiniTableDanByDirectionReadOnly() {
+        synchronized (MINI_TABLE_LOCK) {
+            Map<String, Map<String, Map<String, Double>>> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, Map<String, Double>>> dirEntry : miniTableDanByDirection.entrySet()) {
+                Map<String, Map<String, Double>> dirMap = new LinkedHashMap<>();
+                for (Map.Entry<String, Map<String, Double>> itemEntry : dirEntry.getValue().entrySet()) {
+                    dirMap.put(itemEntry.getKey(), Map.copyOf(itemEntry.getValue()));
+                }
+                copy.put(dirEntry.getKey(), Collections.unmodifiableMap(dirMap));
             }
             return Collections.unmodifiableMap(copy);
         }
@@ -1005,7 +1047,9 @@ public class Tab5_DanPanelService {
                 return r.vatChat;
             }
         }
-        return label;
+        // Fallback: map tĩnh label → loai_dan mặc định khi step4 chưa có dữ liệu
+        String defaultLoaiDan = LABEL_TO_DEFAULT_LOAI_DAN.get(label != null ? label.trim() : "");
+        return defaultLoaiDan != null ? defaultLoaiDan : label;
     }
 
     private boolean matchesLabel(String loaiDan, String label) {
@@ -1235,26 +1279,108 @@ public class Tab5_DanPanelService {
         return String.format("%.2f", value);
     }
 
+    /**
+     * Xuất dữ liệu bảng Đạn theo keyword từng ô: {{dan_r{row}_c{cell}}}.
+     * <p>
+     * Bảng Word template có 40 dòng dữ liệu (row 1..40) × 35 ô (cell 0..34).
+     * Mapping ô Word ↔ cột UI (29 cột 0..28):
+     * <ul>
+     *   <li>cell 0  → STT (số thứ tự tự tăng theo dòng UI)</li>
+     *   <li>cell 1  → UI col 0  (Loại đạn)</li>
+     *   <li>cell 2  → UI col 1  (Số lượng VK)</li>
+     *   <li>cell 3  → UI col 2  (Nhu cầu CS)</li>
+     *   <li>cell 4  → UI col 3  (Nhu cầu TL)</li>
+     *   <li>cell 5  → UI col 4  (GĐCB CS)</li>
+     *   <li>cell 6  → UI col 5  (GĐCB TL)</li>
+     *   <li>cell 7  → UI col 6  (GĐCĐ CS)</li>
+     *   <li>cell 8  → UI col 7  (GĐCĐ TL)</li>
+     *   <li>cell 9  → UI col 8  (PC SCĐ ĐV)</li>
+     *   <li>cell 10 → UI col 9  (PC SCĐ Kho)</li>
+     *   <li>cell 11 → UI col 10 (PC SCĐ TL)</li>
+     *   <li>cell 12 → UI col 11 (Hiện có ĐV d)</li>
+     *   <li>cell 13 → UI col 12 (Hiện có ĐV PT)</li>
+     *   <li>cell 14 → UI col 13 (Hiện có ĐV TL)</li>
+     *   <li>cell 15 → UI col 14 (Hiện có Kho d)</li>
+     *   <li>cell 16 → UI col 15 (Hiện có Kho PT)</li>
+     *   <li>cell 17 → UI col 16 (Hiện có Kho TL)</li>
+     *   <li>cell 18 → UI col 17 (PC TQĐ ĐV)</li>
+     *   <li>cell 19 → UI col 18 (PC TQĐ Kho)</li>
+     *   <li>cell 20 → UI col 19 (PC TQĐ TL)</li>
+     *   <li>cell 21 → UI col 20 (KHTN TrướcNổ ĐV d)</li>
+     *   <li>cell 22 → UI col 21 (KHTN TrướcNổ ĐV PT)</li>
+     *   <li>cell 23 → UI col 22 (KHTN TrướcNổ ĐV TL)</li>
+     *   <li>cell 24 → UI col 23 (KHTN TrướcNổ Kho d)</li>
+     *   <li>cell 25 → UI col 24 (KHTN TrướcNổ Kho PT)</li>
+     *   <li>cell 26 → UI col 25 (KHTN TrướcNổ Kho TL)</li>
+     *   <li>cell 27 → UI col 26 (KHTN ThựcHành ĐV)</li>
+     *   <li>cell 28 → UI col 27 (KHTN ThựcHành Kho)</li>
+     *   <li>cell 29 → UI col 28 (KHTN ThựcHành TL)</li>
+     *   <li>cell 30..34 → (ô thừa trong Word - để trống)</li>
+     * </ul>
+     * Các dòng UI vượt quá 40 sẽ bị bỏ. Các dòng Word vượt quá số dòng UI → keyword rỗng ("").
+     */
     public Map<String, String> getExportData(DefaultTableModel danModel) {
         Map<String, String> data = new HashMap<>();
-        data.put("<<rows_bang_dan>>", buildTableHtml(danModel));
+        final int WORD_MAX_ROWS = 80;   // số dòng dữ liệu trong Word template
+        final int WORD_CELLS    = 35;   // số ô vật lý mỗi dòng
+        final int UI_COLS       = COL_COUNT; // = 29
+
+        // Lấy danh sách hàng cần xuất từ model
+        List<Object[]> exportRows = new ArrayList<>();
+        if (danModel != null) {
+            for (int i = 0; i < danModel.getRowCount() && exportRows.size() < WORD_MAX_ROWS; i++) {
+                Object[] row = new Object[UI_COLS];
+                for (int j = 0; j < UI_COLS; j++) {
+                    row[j] = danModel.getValueAt(i, j);
+                }
+                exportRows.add(row);
+            }
+        }
+
+        // Generate keyword → value cho từng ô trong 40 hàng
+        for (int wordRow = 1; wordRow <= WORD_MAX_ROWS; wordRow++) {
+            boolean hasData = wordRow <= exportRows.size();
+            Object[] uiRow = hasData ? exportRows.get(wordRow - 1) : null;
+
+            for (int wordCell = 0; wordCell < WORD_CELLS; wordCell++) {
+                String key = "{{dan_r" + wordRow + "_c" + wordCell + "}}";
+                String val = "";
+
+                if (hasData) {
+                    if (wordCell == 0) {
+                        // STT = số thứ tự (dòng trong export, 1-based)
+                        val = String.valueOf(wordRow);
+                    } else if (wordCell == 1) {
+                        // UI col 0: Loại đạn
+                        val = cellStr(uiRow[0]);
+                    } else if (wordCell == 2) {
+                        // UI col 1: Số lượng VK
+                        val = cellStr(uiRow[1]);
+                    } else {
+                        // wordCell 3..29 → UI col (wordCell - 3 + 2) = wordCell - 1
+                        // wordCell 3 → UI col 2
+                        // wordCell 4 → UI col 3
+                        // ...
+                        // wordCell 29 → UI col 28
+                        // wordCell 30..34 → thừa, để trống
+                        int uiCol = wordCell - 1; // cell3→col2, cell4→col3,..., cell29→col28
+                        if (uiCol >= 2 && uiCol < UI_COLS) {
+                            val = cellStr(uiRow[uiCol]);
+                        }
+                        // else val = "" (ô thừa cell 30-34)
+                    }
+                }
+                data.put(key, val);
+            }
+        }
         return data;
     }
 
-    private String buildTableHtml(DefaultTableModel m) {
-        if (m == null || m.getRowCount() == 0) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < m.getRowCount(); i++) {
-            sb.append("<tr>");
-            for (int j = 0; j < m.getColumnCount(); j++) {
-                Object val = m.getValueAt(i, j);
-                String text = (val == null) ? "" : val.toString().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-                if (j == 0) sb.append("<td class='text-left'>").append(text).append("</td>");
-                else sb.append("<td>").append(text).append("</td>");
-            }
-            sb.append("</tr>");
-        }
-        return sb.toString();
+    /** Chuyển giá trị ô model sang String an toàn. Bỏ giá trị "-" (mask ô Hướng). */
+    private static String cellStr(Object o) {
+        if (o == null) return "";
+        String s = o.toString().trim();
+        return "-".equals(s) ? "" : s;
     }
 
     static final class Step3DanRow {
@@ -1262,6 +1388,46 @@ public class Tab5_DanPanelService {
         double donVi;
         double phoiThuoc;
         double khoD;
+    }
+
+    private void populateMiniTableDanByDirection(Map<String, Map<String, Object[]>> leafByHuong) {
+        synchronized (MINI_TABLE_LOCK) {
+            miniTableDanByDirection.clear();
+            for (Map.Entry<String, Map<String, Object[]>> dirEntry : leafByHuong.entrySet()) {
+                String huong = dirEntry.getKey();
+                Map<String, Object[]> dirMap = dirEntry.getValue();
+                Map<String, Map<String, Double>> outMap = new LinkedHashMap<>();
+                
+                for (Map.Entry<String, Object[]> itemEntry : dirMap.entrySet()) {
+                    String label = itemEntry.getKey().trim();
+                    Object[] row = itemEntry.getValue();
+                    
+                    double tlDv = 0;
+                    double tlKho = 0;
+                    double tlTh = 0;
+                    
+                    try {
+                        if (row[22] != null && !row[22].toString().isBlank() && !"-".equals(row[22])) {
+                            tlDv = Double.parseDouble(row[22].toString().replace(",", "."));
+                        }
+                        if (row[25] != null && !row[25].toString().isBlank() && !"-".equals(row[25])) {
+                            tlKho = Double.parseDouble(row[25].toString().replace(",", "."));
+                        }
+                        if (row[28] != null && !row[28].toString().isBlank() && !"-".equals(row[28])) {
+                            tlTh = Double.parseDouble(row[28].toString().replace(",", "."));
+                        }
+                    } catch (Exception e) {}
+                    
+                    Map<String, Double> valMap = new LinkedHashMap<>();
+                    valMap.put(TL_TRUOC_NO_DV, tlDv);
+                    valMap.put(TL_TRUOC_NO_KHO, tlKho);
+                    valMap.put(TL_THUC_HANH, tlTh);
+                    
+                    outMap.put(label, valMap);
+                }
+                miniTableDanByDirection.put(huong, outMap);
+            }
+        }
     }
 
     static final class Step4DanRow {

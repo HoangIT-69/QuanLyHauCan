@@ -101,9 +101,23 @@ public class H2SchemaInitializer {
                             "  `ty_le` VARCHAR(50)," +
                             "  `nam` INT," +
                             "  `chi_huy` VARCHAR(255)," +
-                            "  `nguoi_thay_the` VARCHAR(255)" +
+                            "  `nguoi_thay_the` VARCHAR(255)," +
+                            "  `don_vi_chu_quan` VARCHAR(255)," +
+                            "  `don_vi_lap` VARCHAR(255)," +
+                            "  `so_ke_hoach` VARCHAR(255)," +
+                            "  `chuc_vu_phe_chuan` VARCHAR(255)," +
+                            "  `mat_do` VARCHAR(255)" +
                             ");"
             );
+            String[] step1Cols = {
+                "don_vi_chu_quan VARCHAR(255)", "don_vi_lap VARCHAR(255)", "so_ke_hoach VARCHAR(255)", 
+                "chuc_vu_phe_chuan VARCHAR(255)", "mat_do VARCHAR(255)"
+            };
+            for (String col : step1Cols) {
+                try {
+                    stmt.executeUpdate("ALTER TABLE step1_thong_tin ADD COLUMN " + col);
+                } catch (SQLException ignored) {}
+            }
 
             // 7. Bảng step3_vat_chat (phân cấp theo tên cột nghiệp vụ; giữ cột legacy để migrate)
             stmt.executeUpdate(
@@ -289,21 +303,21 @@ public class H2SchemaInitializer {
      * Seed dữ liệu quy ước mặc định (idempotent) để hệ thống có dữ liệu khởi tạo.
      */
     private static void seedDefaultConventions(Statement stmt) throws SQLException {
-        // quyuoc_bienche (đủ nhóm: Tiểu đoàn / Trung đoàn / Sư đoàn / Khác)
+        // quyuoc_bienche (đủ nhóm: Tiểu đoàn / Trung đoàn / Sư đoàn)
         stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
                 "SELECT 'Tiểu đoàn', 'Tiểu đoàn bộ binh', 500, 120, 80, 60, 24, 12, 18, 6, 6, 0, 0, 0 " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Tiểu đoàn bộ binh')");
         stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
-                "SELECT 'Tiểu đoàn', 'Đại đội hỏa lực', 150, 30, 10, 6, 3, 1, 4, 4, 2, 0, 0, 0 " +
+                "SELECT 'Sư đoàn', 'Đại đội hỏa lực', 150, 30, 10, 6, 3, 1, 4, 4, 2, 0, 0, 0 " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Đại đội hỏa lực')");
         stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
                 "SELECT 'Trung đoàn', 'Trung đoàn bộ binh', 300, 50, 20, 10, 4, 2, 4, 2, 2, 0, 0, 0 " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Trung đoàn bộ binh')");
         stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
-                "SELECT 'Sư đoàn', 'Tiểu đoàn pháo binh', 420, 80, 20, 8, 4, 2, 6, 8, 6, 4, 2, 2 " +
+                "SELECT 'Tiểu đoàn', 'Tiểu đoàn pháo binh', 420, 80, 20, 8, 4, 2, 6, 8, 6, 4, 2, 2 " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Tiểu đoàn pháo binh')");
         stmt.executeUpdate("INSERT INTO quyuoc_bienche (nhom_don_vi, ten_don_vi, quan_so, luu_dan, sung_ngan, tieu_lien, trung_lien, dai_lien, b41, co60mm, co82mm, co100mm, spg9, smpk_127mm) " +
-                "SELECT 'Khác', 'Đơn vị bảo đảm', 90, 10, 10, 4, 2, 0, 0, 0, 0, 0, 0, 0 " +
+                "SELECT 'Tiểu đoàn', 'Đơn vị bảo đảm', 90, 10, 10, 4, 2, 0, 0, 0, 0, 0, 0, 0 " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_bienche WHERE ten_don_vi = 'Đơn vị bảo đảm')");
 
         // quyuoc_dan (đủ danh mục)
@@ -322,6 +336,21 @@ public class H2SchemaInitializer {
         stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
                 "SELECT 'Mìn, Lựu đạn', 'Lựu đạn mỏ vịt', 2, 0.450, 'Quả' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Lựu đạn mỏ vịt')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn cối', 'Đạn Cối 60mm', 20, 1.360, 'Viên' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn Cối 60mm')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn cối', 'Đạn Cối 82mm', 15, 3.080, 'Viên' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn Cối 82mm')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn cối', 'Đạn Cối 100mm', 10, 8.000, 'Viên' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn Cối 100mm')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn chống tăng', 'Đạn SPG-9', 6, 2.700, 'Viên' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn SPG-9')");
+        stmt.executeUpdate("INSERT INTO quyuoc_dan (danh_muc, loai_dan, so_vien_tren_coso, trong_luong_1_vien, don_vi_tinh) " +
+                "SELECT 'Đạn BB nhóm I', 'Đạn 9mm', 50, 0.012, 'Viên' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_dan WHERE loai_dan = 'Đạn 9mm')");
 
         // quyuoc_vchc (đủ danh mục + item đặc biệt để test nghiệp vụ)
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +

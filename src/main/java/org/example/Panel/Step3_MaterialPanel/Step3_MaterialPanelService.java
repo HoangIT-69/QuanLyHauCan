@@ -275,6 +275,9 @@ public class Step3_MaterialPanelService {
             if (phanCount > 4) {
                 ui[4] = f.ll_con_lai;
             }
+            if (phanCount > 5) {
+                ui[5] = f.db_bcht;
+            }
         } else {
             if (phanCount > 0) {
                 ui[0] = f.huong_cy;
@@ -307,6 +310,7 @@ public class Step3_MaterialPanelService {
             f.ll_cd_vong_ngoai = six.length > 2 ? six[2] : 0;
             f.ll_db_co_dong = six.length > 3 ? six[3] : 0;
             f.ll_con_lai = six.length > 4 ? six[4] : 0;
+            f.db_bcht = six.length > 5 ? six[5] : 0;
         } else {
             f.huong_cy = six.length > 0 ? six[0] : 0;
             f.huong_ty_1 = six.length > 1 ? six[1] : 0;

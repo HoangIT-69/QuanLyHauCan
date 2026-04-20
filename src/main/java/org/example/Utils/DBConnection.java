@@ -18,9 +18,32 @@ public class DBConnection {
     // --------------------------------------------------------
     // 2. CẤU HÌNH H2 OFFLINE (Dự phòng)
     // --------------------------------------------------------
-    // DB_CLOSE_DELAY=-1: giữ DB mở trong JVM sau khi đóng connection cuối — giảm chi phí mở/đóng file H2 liên tục.
-    // CACHE_SIZE: tăng cache page (KB) cho file-based; phù hợp desktop offline.
-    private static final String H2_URL = "jdbc:h2:file:./data/db_haucan;MODE=MySQL;DATABASE_TO_UPPER=false;CASE_INSENSITIVE_IDENTIFIERS=TRUE;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1;CACHE_SIZE=65536";
+    // Lấy thư mục chứa JAR/EXE để đường dẫn data luôn đúng dù chạy từ đâu
+    private static final String H2_DB_PATH = getH2DbPath();
+
+    private static String getH2DbPath() {
+        try {
+            // Lấy đường dẫn thư mục chứa file JAR/EXE đang chạy
+            java.net.URL location = DBConnection.class.getProtectionDomain().getCodeSource().getLocation();
+            java.io.File jarFile = new java.io.File(location.toURI());
+            java.io.File appDir = jarFile.isFile() ? jarFile.getParentFile() : jarFile;
+            java.io.File dataDir = new java.io.File(appDir, "data");
+            dataDir.mkdirs();
+            return dataDir.getAbsolutePath() + "/db_haucan";
+        } catch (Exception e) {
+            // Fallback: thư mục hiện tại
+            new java.io.File("./data").mkdirs();
+            return "./data/db_haucan";
+        }
+    }
+
+    private static String buildH2Url() {
+        return "jdbc:h2:file:" + H2_DB_PATH +
+                ";MODE=MySQL;DATABASE_TO_UPPER=false;CASE_INSENSITIVE_IDENTIFIERS=TRUE" +
+                ";DB_CLOSE_DELAY=-1;CACHE_SIZE=65536";
+    }
+
+    private static final String H2_URL = buildH2Url();
     private static final String H2_USER = "sa";
     private static final String H2_PASSWORD = "";
 

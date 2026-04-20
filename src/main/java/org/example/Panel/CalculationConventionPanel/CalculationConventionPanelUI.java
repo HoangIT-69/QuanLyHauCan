@@ -28,6 +28,7 @@ public class CalculationConventionPanelUI extends JPanel {
 
     private DefaultTableModel modelBienChe;
     private JTable tableBienChe;
+    private JComboBox<String> cbNhomDV;
     private JTextField[] fieldsBC;
     private int selectedIdBC = -1;
 
@@ -332,19 +333,26 @@ public class CalculationConventionPanelUI extends JPanel {
         String[] labels = {"Nhóm ĐV:", "Tên ĐV:", "Quân số:", "Lựu đạn:", "Súng ngắn:", "Tiểu liên:", "Trung liên:", "Đại liên:", "B41:", "Cối 60:", "Cối 82:", "Cối 100:", "SPG-9:", "12.7mm:"};
         fieldsBC = new JTextField[labels.length];
 
+        cbNhomDV = new JComboBox<>(new String[]{"Tiểu đoàn", "Trung đoàn", "Sư đoàn"});
+        cbNhomDV.setPreferredSize(new Dimension(140, 35));
+
         int r = 0, c = 0;
         for (int i = 0; i < labels.length; i++) {
             gbc.gridy = r; gbc.gridx = c; gbc.weightx = 0;
             formPanel.add(new JLabel(labels[i]), gbc);
 
             gbc.gridx = c + 1;
-            fieldsBC[i] = new JTextField();
-            fieldsBC[i].setPreferredSize(new Dimension(140, 35));
-            if (i >= 2) {
-                InputValidator.restrictToNumbers(fieldsBC[i], false);
-                fieldsBC[i].setText("0");
+            if (i == 0) {
+                formPanel.add(cbNhomDV, gbc);
+            } else {
+                fieldsBC[i] = new JTextField();
+                fieldsBC[i].setPreferredSize(new Dimension(140, 35));
+                if (i >= 2) {
+                    InputValidator.restrictToNumbers(fieldsBC[i], false);
+                    fieldsBC[i].setText("0");
+                }
+                formPanel.add(fieldsBC[i], gbc);
             }
-            formPanel.add(fieldsBC[i], gbc);
 
             c += 2;
             if (c >= 8) {
@@ -382,7 +390,8 @@ public class CalculationConventionPanelUI extends JPanel {
             int row = tableBienChe.getSelectedRow();
             if (row >= 0) {
                 selectedIdBC = (int) modelBienChe.getValueAt(row, 0);
-                for (int i = 0; i < fieldsBC.length; i++) {
+                cbNhomDV.setSelectedItem(modelBienChe.getValueAt(row, 1).toString());
+                for (int i = 1; i < fieldsBC.length; i++) {
                     fieldsBC[i].setText(modelBienChe.getValueAt(row, i + 1).toString());
                 }
             }
@@ -393,7 +402,7 @@ public class CalculationConventionPanelUI extends JPanel {
         btnDelete.addActionListener(e -> deleteBienChe());
         btnClear.addActionListener(e -> {
             selectedIdBC = -1;
-            fieldsBC[0].setText("");
+            cbNhomDV.setSelectedIndex(0);
             fieldsBC[1].setText("");
             for (int i = 2; i < fieldsBC.length; i++) {
                 fieldsBC[i].setText("0");
@@ -414,7 +423,8 @@ public class CalculationConventionPanelUI extends JPanel {
 
     private String[] collectBienCheTexts() {
         String[] t = new String[14];
-        for (int i = 0; i < 14; i++) {
+        t[0] = cbNhomDV.getSelectedItem() != null ? cbNhomDV.getSelectedItem().toString() : "";
+        for (int i = 1; i < 14; i++) {
             t[i] = fieldsBC[i].getText();
         }
         return t;
@@ -444,7 +454,7 @@ public class CalculationConventionPanelUI extends JPanel {
         if (confirm == JOptionPane.YES_OPTION && conventionService.deleteBienCheById(selectedIdBC)) {
             loadDataBienChe();
             selectedIdBC = -1;
-            fieldsBC[0].setText("");
+            cbNhomDV.setSelectedIndex(0);
             fieldsBC[1].setText("");
             for (int i = 2; i < fieldsBC.length; i++) {
                 fieldsBC[i].setText("0");

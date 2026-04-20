@@ -9,6 +9,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,12 +22,28 @@ public class UnitDataEntryDialogService {
 
     private static final Map<String, Vector<Vector<Object>>> SHARED_STORE = new HashMap<>();
 
+    /** Tập hướng đã bị xóa khỏi sa bàn — cần DELETE khỏi DB khi lưu. */
+    private static final Set<String> DELETED_HUONG = new LinkedHashSet<>();
+
     public static Map<String, Vector<Vector<Object>>> getSharedStore() {
         return SHARED_STORE;
     }
 
     public static void clearSharedStore() {
         SHARED_STORE.clear();
+        DELETED_HUONG.clear();
+    }
+
+    public static void markHuongDeleted(String huong) {
+        DELETED_HUONG.add(huong);
+    }
+
+    public static Set<String> getDeletedHuong() {
+        return DELETED_HUONG;
+    }
+
+    public static void clearDeletedHuong() {
+        DELETED_HUONG.clear();
     }
 
     public Set<String> loadUsedTenDonViAcrossSession(int sessionId) {

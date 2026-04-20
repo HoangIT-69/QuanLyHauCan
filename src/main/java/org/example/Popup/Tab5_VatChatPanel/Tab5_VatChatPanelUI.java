@@ -148,7 +148,8 @@ public class Tab5_VatChatPanelUI extends JPanel {
 
         int wQddt = scaledWidths[5] + scaledWidths[6] + scaledWidths[7] + scaledWidths[8] + scaledWidths[9] + scaledWidths[10];
         int wHienCo = scaledWidths[11] + scaledWidths[12] + scaledWidths[13] + scaledWidths[14] + scaledWidths[15];
-        int wBoSung = scaledWidths[16] + scaledWidths[17] + scaledWidths[18] + scaledWidths[19] + scaledWidths[20] + scaledWidths[21] + scaledWidths[22];
+        int wPcTqd  = scaledWidths[16] + scaledWidths[17];
+        int wBoSung = scaledWidths[18] + scaledWidths[19] + scaledWidths[20] + scaledWidths[21] + scaledWidths[22];
         int wKeHoach = scaledWidths[23] + scaledWidths[24] + scaledWidths[25] + scaledWidths[26];
 
         addHeaderCell("Chi tieu", x[0], y0, scaledWidths[0], totalHeaderHeight, newFontSize);
@@ -159,7 +160,8 @@ public class Tab5_VatChatPanelUI extends JPanel {
 
         addHeaderCell("Quy dinh du tru, tieu thu", x[5], y0, wQddt, hRow, newFontSize);
         addHeaderCell("Hien co", x[11], y0, wHienCo, hRow, newFontSize);
-        addHeaderCell("Bo sung", x[16], y0, wBoSung, hRow, newFontSize);
+        addHeaderCell("PC TQD", x[16], y0, wPcTqd, hRow, newFontSize);
+        addHeaderCell("Bo sung", x[18], y0, wBoSung, hRow, newFontSize);
         addHeaderCell("Ke hoach tiep nhan, bao dam", x[23], y0, wKeHoach, hRow, newFontSize);
 
         addHeaderCell("Quy dinh du tru", x[5], y1, scaledWidths[5], hRow * 2, newFontSize);
@@ -170,7 +172,8 @@ public class Tab5_VatChatPanelUI extends JPanel {
         addHeaderCell("DV", x[13], y1, scaledWidths[13] + scaledWidths[14], hRow, newFontSize);
         addHeaderCell("+", x[15], y1, scaledWidths[15], hRow * 2, newFontSize);
 
-        addHeaderCell("PC TQD", x[16], y1, scaledWidths[16] + scaledWidths[17], hRow, newFontSize);
+        addHeaderCell("Kho/d", x[16], y1, scaledWidths[16], hRow * 2, newFontSize);
+        addHeaderCell("DV", x[17], y1, scaledWidths[17], hRow * 2, newFontSize);
         addHeaderCell("GDCB", x[18], y1, scaledWidths[18] + scaledWidths[19], hRow, newFontSize);
         addHeaderCell("GDCD", x[20], y1, scaledWidths[20] + scaledWidths[21], hRow, newFontSize);
         addHeaderCell("+", x[22], y1, scaledWidths[22], hRow * 2, newFontSize);
@@ -191,8 +194,6 @@ public class Tab5_VatChatPanelUI extends JPanel {
         addHeaderCell("d", x[13], y2, scaledWidths[13], hRow, newFontSize);
         addHeaderCell("PT", x[14], y2, scaledWidths[14], hRow, newFontSize);
 
-        addHeaderCell("Kho/d", x[16], y2, scaledWidths[16], hRow, newFontSize);
-        addHeaderCell("DV", x[17], y2, scaledWidths[17], hRow, newFontSize);
         addHeaderCell("Kho/d", x[18], y2, scaledWidths[18], hRow, newFontSize);
         addHeaderCell("DV", x[19], y2, scaledWidths[19], hRow, newFontSize);
         addHeaderCell("Kho/d", x[20], y2, scaledWidths[20], hRow, newFontSize);

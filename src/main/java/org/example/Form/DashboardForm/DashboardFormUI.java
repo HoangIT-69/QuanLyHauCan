@@ -44,6 +44,7 @@ public class DashboardFormUI extends JFrame {
         this.currentUser = dashboardService.resolveDisplayUsername(username);
         this.currentRole = dashboardService.normalizeRole(role);
         this.hinhThucTapBai = hinhThuc;
+        org.example.Utils.AppSession.set(userId, username);
 
         setTitle("Phần mềm hỗ trợ tập bài bảo đảm hậu cần, kỹ thuật tiểu đoàn bộ binh chiến đấu");
         setSize(1280, 760);
