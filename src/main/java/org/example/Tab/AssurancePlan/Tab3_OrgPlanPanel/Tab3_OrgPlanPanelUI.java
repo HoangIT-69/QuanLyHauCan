@@ -29,6 +29,11 @@ public class Tab3_OrgPlanPanelUI extends JPanel {
         this(new Tab3_OrgPlanPanelService());
     }
 
+    public Tab3_OrgPlanPanelUI(int sessionId) {
+        this(new Tab3_OrgPlanPanelService());
+        // Bỏ loadTenLucLuong từ DB, chuyển sang dùng danh sách cố định
+    }
+
     public Tab3_OrgPlanPanelUI(Tab3_OrgPlanPanelService service) {
         this.service = service != null ? service : new Tab3_OrgPlanPanelService();
         setLayout(new BorderLayout());
@@ -49,6 +54,24 @@ public class Tab3_OrgPlanPanelUI extends JPanel {
         mainContainer.add(UIUtils.createSectionLabel("1. Tổ chức sử dụng ,lực lượng"));
         mainContainer.add(Box.createVerticalStrut(10));
         mainContainer.add(createTablePanel());
+        
+        // Nút thêm/xóa dòng
+        JPanel pnlAction = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        pnlAction.setOpaque(false);
+        pnlAction.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        JButton btnAdd = new JButton("Thêm dòng");
+        JButton btnDelete = new JButton("Xóa dòng");
+        styleActionBtn(btnAdd);
+        styleActionBtn(btnDelete);
+        
+        btnAdd.addActionListener(e -> addRow());
+        btnDelete.addActionListener(e -> deleteRow());
+        
+        pnlAction.add(btnAdd);
+        pnlAction.add(btnDelete);
+        mainContainer.add(pnlAction);
+        
         mainContainer.add(Box.createVerticalStrut(25));
 
         mainContainer.add(UIUtils.createSectionLabel("2. Bố trí hậu cần kĩ thuật"));
@@ -80,11 +103,27 @@ public class Tab3_OrgPlanPanelUI extends JPanel {
         model = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return row != 10;
+                return row != getRowCount() - 1;
             }
         };
 
-        for (int i = 0; i < 10; i++) {
+        String[] fixedForces = {
+                "Trợ lý hậu cần",
+                "N.viên QN+KT",
+                "Quân y/d",
+                "Quân y/e",
+                "Vận tải bộ/d",
+                "Vận tải bộ/e",
+                "Nuôi quân",
+                "Nhân viên QK",
+                "Tổ sửa chữa/e"
+        };
+
+        for (String force : fixedForces) {
+            model.addRow(new Object[]{force, "", "", "", "", "", "", ""});
+        }
+        // Thêm một vài dòng trống dự phòng
+        for (int i = 0; i < 3; i++) {
             model.addRow(new Object[]{"", "", "", "", "", "", "", ""});
         }
         model.addRow(new Object[]{"Cộng", "", "", "", "", "", "", ""});
@@ -101,7 +140,7 @@ public class Tab3_OrgPlanPanelUI extends JPanel {
 
                 ((JComponent) c).setBorder(BorderFactory.createMatteBorder(0, 0, 1, column == 7 ? 0 : 1, new Color(226, 232, 240)));
 
-                if (row == 10) {
+                if (row == tbl.getRowCount() - 1) {
                     c.setFont(new Font("Times New Roman", Font.BOLD, 15));
                     c.setBackground(new Color(241, 245, 249));
                     c.setForeground(Color.BLACK);
@@ -131,7 +170,7 @@ public class Tab3_OrgPlanPanelUI extends JPanel {
                 if (isCalculating) return;
                 if (e.getType() == TableModelEvent.UPDATE) {
                     int row = e.getFirstRow();
-                    if (row < 10) {
+                    if (row < model.getRowCount() - 1) {
                         isCalculating = true;
                         recalculateSum();
                         isCalculating = false;
@@ -196,18 +235,56 @@ public class Tab3_OrgPlanPanelUI extends JPanel {
     }
 
     private void recalculateSum() {
+        int rowCount = model.getRowCount();
+        if (rowCount <= 1) return;
+        
+        int lastRow = rowCount - 1;
         for (int col : SUM_COLUMNS) {
             int sum = 0;
             boolean hasValue = false;
-            for (int row = 0; row < 10; row++) {
+            for (int row = 0; row < lastRow; row++) {
                 int val = parseIntSafe(getCellValue(row, col));
                 if (val != 0 || !getCellValue(row, col).isEmpty()) hasValue = true;
                 sum += val;
             }
-            model.setValueAt(hasValue ? String.valueOf(sum) : "", 10, col);
+            model.setValueAt(hasValue ? String.valueOf(sum) : "", lastRow, col);
         }
-        model.setValueAt("", 10, 4);
-        model.setValueAt("Cộng", 10, 0);
+        model.setValueAt("", lastRow, 4);
+        model.setValueAt("Cộng", lastRow, 0);
+    }
+
+    private void addRow() {
+        isCalculating = true;
+        int lastRow = model.getRowCount() - 1;
+        model.insertRow(lastRow, new Object[]{"", "", "", "", "", "", "", ""});
+        isCalculating = false;
+    }
+
+    private void deleteRow() {
+        int selected = table.getSelectedRow();
+        int lastRow = model.getRowCount() - 1;
+        if (selected >= 0 && selected < lastRow) {
+            isCalculating = true;
+            model.removeRow(selected);
+            recalculateSum();
+            isCalculating = false;
+        } else if (lastRow > 0) {
+            isCalculating = true;
+            model.removeRow(lastRow - 1);
+            recalculateSum();
+            isCalculating = false;
+        }
+    }
+
+    private void styleActionBtn(JButton btn) {
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setBackground(new Color(248, 250, 252));
+        btn.setForeground(AssurancePlanUiUtils.SLATE_TEXT);
+        btn.setFocusPainted(false);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(203, 213, 225), 1),
+                BorderFactory.createEmptyBorder(5, 10, 5, 10)
+        ));
     }
 
     private int parseIntSafe(String text) {
@@ -218,6 +295,8 @@ public class Tab3_OrgPlanPanelUI extends JPanel {
             return 0;
         }
     }
+
+    // loadTenLucLuong đã được xóa bỏ theo yêu cầu cố định lực lượng.
 
     public Map<String, String> getExportData() {
         return service.buildExportData(model, txtViTriChinhThuc.getText(), txtViTriDuBi.getText());

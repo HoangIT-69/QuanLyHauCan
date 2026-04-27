@@ -28,7 +28,7 @@ public class Tab9_TransportService {
     // Chỉ số dòng cố định trong modelKhoiLuong
     private static final int ROW_TOAN_TRAN   = 1;
     private static final int ROW_GDCB        = 2;
-    private static final int ROW_GDCD        = 6;
+    private static final int ROW_GDCD        = 7;
 
     /**
      * Lắp dữ liệu Đạn vào Bảng 1 từ {@link Tab5_DanPanelService#globalTonnageData}.
@@ -83,42 +83,66 @@ public class Tab9_TransportService {
      */
     public Map<String, String> getExportData(String duongVanTai,
                                               DefaultTableModel modelKhoiLuong,
-                                              DefaultTableModel modelKeHoach) {
+                                              DefaultTableModel modelKeHoach,
+                                              String bpChuanBi,
+                                              String bpChienDau,
+                                              String bpSauChienDau) {
         Map<String, String> data = new HashMap<>();
         data.put("<<duong_van_tai>>", duongVanTai);
-        data.put("<<rows_bang_khoi_luong_van_tai>>", buildTableHtml(modelKhoiLuong));
-        data.put("<<rows_bang_ke_hoach_van_tai>>", buildTableHtml(modelKeHoach));
+        data.put("<<bp_vt_cb>>", bpChuanBi);
+        data.put("<<bp_vt_cd>>", bpChienDau);
+        data.put("<<bp_vt_sau>>", bpSauChienDau);
+        
+        // Bảng 1: Khối lượng vận tải (13 cột, fix 11 dòng - có thêm dòng "Kho" ở GĐ chuẩn bị)
+        int b1Rows = 11;
+        int b1Cols = 13;
+        for (int r = 0; r < b1Rows; r++) {
+            for (int c = 0; c < b1Cols; c++) {
+                String val = "";
+                if (modelKhoiLuong != null && r < modelKhoiLuong.getRowCount() && c < modelKhoiLuong.getColumnCount()) {
+                    Object obj = modelKhoiLuong.getValueAt(r, c);
+                    val = obj == null ? "" : obj.toString();
+                }
+                data.put("<<kl_r" + r + "_c" + c + ">>", val);
+            }
+        }
+
+        // Keyword tiện dụng cho dòng "Kho" của GĐ chuẩn bị (row index = 6)
+        data.put("<<kl_gdcb_kho_dan>>",  getCell(modelKhoiLuong, 6, 2));
+        data.put("<<kl_gdcb_kho_vtkt>>", getCell(modelKhoiLuong, 6, 3));
+        data.put("<<kl_gdcb_kho_qn>>",   getCell(modelKhoiLuong, 6, 5));
+        data.put("<<kl_gdcb_kho_qy>>",   getCell(modelKhoiLuong, 6, 6));
+        data.put("<<kl_gdcb_kho_dt>>",   getCell(modelKhoiLuong, 6, 7));
+        data.put("<<kl_gdcb_kho_khac>>", getCell(modelKhoiLuong, 6, 9));
+        data.put("<<kl_gdcb_kho_cong>>", getCell(modelKhoiLuong, 6, 10));
+        data.put("<<kl_gdcb_kho_nguoi>>", getCell(modelKhoiLuong, 6, 11));
+        data.put("<<kl_gdcb_kho_ghichu>>", getCell(modelKhoiLuong, 6, 12));
+        
+        // Bảng 2: Kế hoạch vận tải (12 cột, fix 80 dòng trong template)
+        int b2Rows = 80;
+        int b2Cols = 12;
+        for (int r = 0; r < b2Rows; r++) {
+            for (int c = 0; c < b2Cols; c++) {
+                String val = "";
+                if (modelKeHoach != null && r < modelKeHoach.getRowCount() && c < modelKeHoach.getColumnCount()) {
+                    Object obj = modelKeHoach.getValueAt(r, c);
+                    val = obj == null ? "" : obj.toString();
+                }
+                data.put("<<kh_r" + r + "_c" + c + ">>", val);
+            }
+        }
+        
         return data;
     }
 
-    /**
-     * Chuyển DefaultTableModel → chuỗi HTML các dòng {@code <tr>...</tr>}.
-     * Các dòng tổng/tiêu đề (Toàn trận, Giai đoạn, TỔNG, Hướng, LL) được in đậm ở 2 cột đầu.
-     */
-    public String buildTableHtml(DefaultTableModel m) {
-        if (m == null || m.getRowCount() == 0) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < m.getRowCount(); i++) {
-            sb.append("<tr>");
-            for (int j = 0; j < m.getColumnCount(); j++) {
-                Object val = m.getValueAt(i, j);
-                String text = val == null ? "" : val.toString()
-                        .replace("&", "&amp;")
-                        .replace("<", "&lt;")
-                        .replace(">", "&gt;");
-
-                if (j <= 1 && (text.startsWith("Toàn trận") || text.startsWith("Giai đoạn")
-                        || text.startsWith("TỔNG") || text.startsWith("Hướng") || text.startsWith("LL"))) {
-                    text = "<b>" + text + "</b>";
-                }
-
-                if (j <= 1) sb.append("<td class='text-left'>").append(text).append("</td>");
-                else sb.append("<td>").append(text).append("</td>");
-            }
-            sb.append("</tr>");
-        }
-        return sb.toString();
+    private String getCell(DefaultTableModel model, int row, int col) {
+        if (model == null) return "";
+        if (row < 0 || row >= model.getRowCount() || col < 0 || col >= model.getColumnCount()) return "";
+        Object obj = model.getValueAt(row, col);
+        return obj == null ? "" : obj.toString();
     }
+
+
 
     /**
      * Lấy danh sách các Hướng từ bảng step2_bien_che theo sessionId.

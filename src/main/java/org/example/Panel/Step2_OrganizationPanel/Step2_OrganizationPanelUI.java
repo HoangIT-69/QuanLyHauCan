@@ -75,7 +75,10 @@ public class Step2_OrganizationPanelUI extends JPanel {
         JButton btnNext = UIUtils.createNavButtonWithIcon("Tiếp tục", new Color(41, 128, 185), "/images/next.png", true);
 
         btnBack.addActionListener(e -> parent.navigateStep(1));
-        btnNext.addActionListener(e -> parent.navigateStep(3));
+        btnNext.addActionListener(e -> {
+            parent.saveStep2ToDatabase();
+            parent.navigateStep(3);
+        });
 
         bottomPanel.add(btnBack, BorderLayout.WEST);
         bottomPanel.add(btnNext, BorderLayout.EAST);

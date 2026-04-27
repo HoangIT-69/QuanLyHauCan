@@ -141,6 +141,7 @@ public class Step3_MaterialPanelService {
     }
 
     static final class PhanFields {
+        double phoi_thuoc;
         double huong_cy;
         double huong_ty_1;
         double huong_ty_2;
@@ -180,17 +181,18 @@ public class Step3_MaterialPanelService {
 
                         double[] ui = phanFieldsToUi(f, phongNgu, pc);
 
-                        Object[] rowData = new Object[7 + pc];
+                        Object[] rowData = new Object[8 + pc];
                         rowData[0] = "";
                         rowData[1] = rs.getString("vat_chat");
                         rowData[2] = rs.getString("dvt");
                         rowData[3] = formatDouble(kho + donVi);
                         rowData[4] = formatDouble(kho);
                         rowData[5] = formatDouble(donVi);
+                        rowData[6] = formatDouble(f.phoi_thuoc);
                         for (int i = 0; i < pc; i++) {
-                            rowData[6 + i] = formatDouble(ui[i]);
+                            rowData[7 + i] = formatDouble(ui[i]);
                         }
-                        rowData[6 + pc] = rs.getString("ghi_chu");
+                        rowData[7 + pc] = rs.getString("ghi_chu");
 
                         if (loai == 1) {
                             listDan.add(rowData);
@@ -219,6 +221,7 @@ public class Step3_MaterialPanelService {
 
     private static PhanFields readPhanFields(ResultSet rs, Set<String> colSet) throws Exception {
         PhanFields f = new PhanFields();
+        f.phoi_thuoc = colSet.contains("phoi_thuoc") ? getDoubleCol(rs, colSet, "phoi_thuoc") : 0;
         f.huong_cy = getDoubleCol(rs, colSet, "huong_cy");
 
         if (colSet.contains("huong_ty_1")) {
@@ -231,8 +234,6 @@ public class Step3_MaterialPanelService {
 
         if (colSet.contains("ll_cd_vong_ngoai")) {
             f.ll_cd_vong_ngoai = getDoubleCol(rs, colSet, "ll_cd_vong_ngoai");
-        } else if (colSet.contains("phoi_thuoc")) {
-            f.ll_cd_vong_ngoai = getDoubleCol(rs, colSet, "phoi_thuoc");
         }
 
         if (colSet.contains("ll_db_co_dong")) {
@@ -337,8 +338,8 @@ public class Step3_MaterialPanelService {
             }
 
             String sql = "INSERT INTO step3_vat_chat (session_id, loai_vat_chat, vat_chat, dvt, kho_d, don_vi, "
-                    + "huong_cy, huong_ty_1, huong_ty_2, ll_cd_vong_ngoai, ll_db_co_dong, db_bcht, ll_con_lai, ll_cd_tao_the, ghi_chu) "
-                    + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+                    + "phoi_thuoc, huong_cy, huong_ty_1, huong_ty_2, ll_cd_vong_ngoai, ll_db_co_dong, db_bcht, ll_con_lai, ll_cd_tao_the, ghi_chu) "
+                    + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 for (Step3SaveRow r : rows) {
                     PhanFields f = uiPhanToFields(r.phanSixNormalized(), phongNgu);
@@ -348,15 +349,16 @@ public class Step3_MaterialPanelService {
                     ps.setString(4, r.dvt);
                     ps.setDouble(5, r.khoD);
                     ps.setDouble(6, r.donVi);
-                    ps.setDouble(7, f.huong_cy);
-                    ps.setDouble(8, f.huong_ty_1);
-                    ps.setDouble(9, f.huong_ty_2);
-                    ps.setDouble(10, f.ll_cd_vong_ngoai);
-                    ps.setDouble(11, f.ll_db_co_dong);
-                    ps.setDouble(12, f.db_bcht);
-                    ps.setDouble(13, f.ll_con_lai);
-                    ps.setDouble(14, f.ll_cd_tao_the);
-                    ps.setString(15, r.ghiChu != null ? r.ghiChu : "");
+                    ps.setDouble(7, r.phoiThuoc);
+                    ps.setDouble(8, f.huong_cy);
+                    ps.setDouble(9, f.huong_ty_1);
+                    ps.setDouble(10, f.huong_ty_2);
+                    ps.setDouble(11, f.ll_cd_vong_ngoai);
+                    ps.setDouble(12, f.ll_db_co_dong);
+                    ps.setDouble(13, f.db_bcht);
+                    ps.setDouble(14, f.ll_con_lai);
+                    ps.setDouble(15, f.ll_cd_tao_the);
+                    ps.setString(16, r.ghiChu != null ? r.ghiChu : "");
                     ps.addBatch();
                 }
                 ps.executeBatch();
@@ -389,16 +391,18 @@ public class Step3_MaterialPanelService {
         public final String dvt;
         public final double khoD;
         public final double donVi;
+        public final double phoiThuoc;
         private final double[] phanSix;
         public final String ghiChu;
 
         public Step3SaveRow(int loai, String vatChat, String dvt, double khoD, double donVi,
-                            double[] phanSix, String ghiChu) {
+                            double phoiThuoc, double[] phanSix, String ghiChu) {
             this.loai = loai;
             this.vatChat = vatChat;
             this.dvt = dvt;
             this.khoD = khoD;
             this.donVi = donVi;
+            this.phoiThuoc = phoiThuoc;
             this.phanSix = phanSix != null ? phanSix.clone() : new double[PHAN_SLOT_COUNT];
             this.ghiChu = ghiChu;
         }

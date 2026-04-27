@@ -128,7 +128,7 @@ public class PN_AssurancePlanPanelUI extends JPanel {
         tab2.setNhiemVu(this.initialNhiemVu);
         addTab("II. Nhiệm vụ", "tab2", tab2);
 
-        tab3 = new Tab3_OrgPlanPanelUI();
+        tab3 = new Tab3_OrgPlanPanelUI(sessionId);
         addTab("III. Tổ chức, sử dụng lực lượng...", "tab3", tab3);
 
         tab4 = new Tab4_EquipPlanPanelUI();
@@ -145,7 +145,7 @@ public class PN_AssurancePlanPanelUI extends JPanel {
             tab6.setMac(initialTab6Data.getOrDefault("<<bd_mac>>", ""));
             tab6.setONguNghi(initialTab6Data.getOrDefault("<<bd_o_ngunghi>>", ""));
         }
-        addTab("VI. Bảo đảm đời sống", "tab6", tab6);
+        addTab("VI. Bảo đảm sinh hoạt", "tab6", tab6);
 
         tab7 = new Tab7_MedPlanPanelUI();
         tab7.loadDataFromDatabase(this.sessionId);

@@ -11,7 +11,8 @@ import java.sql.ResultSet;
 public class Tab8_MaintPlanPanelService {
 
     public void loadFromDatabase(int sessionId, DefaultTableModel model, JComponent dialogParent) {
-        for (int r = 2; r < 12; r++) {
+        int rowCount = model.getRowCount();
+        for (int r = 0; r < rowCount; r++) {
             model.setValueAt("0", r, 2);
             model.setValueAt("0", r, 3);
         }
@@ -33,18 +34,18 @@ public class Tab8_MaintPlanPanelService {
                 double tiLe = rs.getDouble("ti_le_hu_hong");
 
                 int rowIndex = -1;
-                if (tenVK.contains("12,7") || tenVK.contains("12.7")) rowIndex = 2;
-                else if (tenVK.contains("100")) rowIndex = 3;
-                else if (tenVK.contains("82")) rowIndex = 4;
-                else if (tenVK.contains("60")) rowIndex = 5;
-                else if (tenVK.contains("spg")) rowIndex = 6;
-                else if (tenVK.contains("b41")) rowIndex = 7;
-                else if (tenVK.contains("đại liên") || rawTen.contains("Đại liên")) rowIndex = 8;
-                else if (tenVK.contains("trung liên") || rawTen.contains("Trung liên")) rowIndex = 9;
-                else if (tenVK.contains("tiểu liên") || rawTen.contains("Tiểu liên")) rowIndex = 10;
-                else if (tenVK.contains("ngắn") || rawTen.contains("Súng ngắn")) rowIndex = 11;
+                if (tenVK.contains("12,7") || tenVK.contains("12.7")) rowIndex = 0;
+                else if (tenVK.contains("100")) rowIndex = 1;
+                else if (tenVK.contains("82")) rowIndex = 2;
+                else if (tenVK.contains("60")) rowIndex = 3;
+                else if (tenVK.contains("spg")) rowIndex = 4;
+                else if (tenVK.contains("b41")) rowIndex = 5;
+                else if (tenVK.contains("đại liên") || rawTen.contains("Đại liên")) rowIndex = 6;
+                else if (tenVK.contains("trung liên") || rawTen.contains("Trung liên")) rowIndex = 7;
+                else if (tenVK.contains("tiểu liên") || rawTen.contains("Tiểu liên")) rowIndex = 8;
+                else if (tenVK.contains("ngắn") || rawTen.contains("Súng ngắn")) rowIndex = 9;
 
-                if (rowIndex != -1) {
+                if (rowIndex != -1 && rowIndex < rowCount) {
                     model.setValueAt(String.valueOf(soLuong), rowIndex, 2);
                     String strTiLe = (tiLe > 0) ? String.valueOf(tiLe).replace(".0", "").replace(".", ",") : "0";
                     model.setValueAt(strTiLe, rowIndex, 3);

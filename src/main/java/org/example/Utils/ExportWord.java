@@ -69,24 +69,23 @@ public class ExportWord {
                 replaceTextInParagraph(paragraph, dataMap);
             }
 
-            // 2. Xử lý các paragraph bên trong Drawing / Text Box (shape)
-            for (XWPFParagraph paragraph : document.getParagraphs()) {
-                for (var run : paragraph.getRuns()) {
-                    // CTR chứa drawing hoặc inline shapes — duyệt nested paragraphs nếu có
-                }
-            }
-            // Duyệt body XML để tìm text box paragraphs
-            replaceInBodyXml(document, dataMap);
-
-            // 3. Xử lý Paragraph trong bảng (CÓ NÂNG CẤP PARSE HTML THÀNH BẢNG WORD)
+            // 2. Xử lý Paragraph trong bảng TRƯỚC (phải làm TRƯỚC replaceInBodyXml)
+            // QUAN TRỌNG: replaceInBodyXml gọi body.set(newBody) sẽ làm DISCONNECT tất cả XWPFTable objects.
+            // Nếu processTable chạy sau body.set(), table.getRow() sẽ throw XmlValueDisconnectedException
+            // và toàn bộ bảng bị bỏ qua → keyword còn nguyên trong file xuất.
             for (XWPFTable table : document.getTables()) {
                 try {
                     processTable(table, dataMap);
                 } catch (Exception ex) {
-                    System.err.println("ExportWord: bỏ qua một bảng do lỗi render: " + ex.getMessage());
-                    ex.printStackTrace();
+                    System.err.println("ExportWord: bỏ qua một bảng do lỗi: " + ex.getMessage());
                 }
             }
+
+            // 3. Xử lý TextBox/Shape và dọn sạch keyword còn sót (chạy SAU bảng)
+            // replaceInBodyXml cũng scan lại toàn bộ body XML (bao gồm bảng) để đảm bảo
+            // không còn keyword nào sót lại do run bị split hoặc các trường hợp đặc biệt.
+            replaceInBodyXml(document, dataMap);
+
 
             try (FileOutputStream fos = new FileOutputStream(outputPath)) {
                 document.write(fos);
@@ -97,39 +96,46 @@ public class ExportWord {
     }
 
     /**
-     * Duyệt XML body để xử lý text trong các Drawing/TextBox/Shape.
+     * Duyệt XML body để xử lý text trong các Drawing/TextBox/Shape VÀ bảng.
      * Word lưu text box dưới dạng wps:txbx → w:txbxContent → w:p, không nằm trong document.getParagraphs().
+     * Các keyword trong bảng cũng có thể bị split run, dùng XML replace để đảm bảo.
      */
     private static void replaceInBodyXml(XWPFDocument document, Map<String, String> dataMap) {
-        try {
-            org.apache.xmlbeans.XmlObject[] txbxContents = document.getDocument().getBody()
-                    .selectPath("declare namespace wps='http://schemas.microsoft.com/office/word/2010/wordprocessingShape'"
-                            + " .//wps:txbx");
-            if (txbxContents != null) {
-                System.out.println("[ExportWord] Found " + txbxContents.length + " text boxes");
-            }
-        } catch (Exception ignored) {
-            // selectPath không available — fallback: replace trực tiếp trong XML string
-        }
-
         // Fallback đáng tin cậy hơn: thay thế trực tiếp trong XML của body
         try {
             org.apache.xmlbeans.XmlObject body = document.getDocument().getBody();
             String xmlStr = body.xmlText();
             boolean changed = false;
-            for (Map.Entry<String, String> entry : dataMap.entrySet()) {
-                String key = entry.getKey();
-                String value = entry.getValue() == null ? "" : entry.getValue();
-                // Escape XML special chars in value
-                String safeValue = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-                if (xmlStr.contains(key)) {
-                    xmlStr = xmlStr.replace(key, safeValue);
+
+            // Tối ưu hóa: Match cả dạng thường ({{...}}) VÀ dạng XML-escaped (&lt;&lt;...&gt;&gt;)
+            // Pattern gộp: match <<...>> (escaped or not) và {{...}}
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "(&lt;&lt;[^&<>]+&gt;&gt;|<<.*?>>|\\{\\{.*?\\}\\})"
+            );
+            java.util.regex.Matcher m = pattern.matcher(xmlStr);
+            StringBuffer sb = new StringBuffer();
+            while (m.find()) {
+                String key = m.group(1);
+                // Decode XML entities để lookup trong dataMap
+                String decodedKey = key.replace("&lt;", "<").replace("&gt;", ">");
+                String lookupKey = dataMap.containsKey(decodedKey) ? decodedKey
+                                 : dataMap.containsKey(key)       ? key
+                                 : null;
+                if (lookupKey != null) {
+                    String value = dataMap.get(lookupKey);
+                    if (value == null) value = "";
+                    // Re-encode value cho XML an toàn
+                    String safeValue = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+                    m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(safeValue));
                     changed = true;
-                    System.out.println("[ExportWord] TextBox replaced: " + key + " -> " + safeValue);
+                } else {
+                    m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(key));
                 }
             }
+            m.appendTail(sb);
+
             if (changed) {
-                org.apache.xmlbeans.XmlObject newBody = org.apache.xmlbeans.XmlObject.Factory.parse(xmlStr);
+                org.apache.xmlbeans.XmlObject newBody = org.apache.xmlbeans.XmlObject.Factory.parse(sb.toString());
                 body.set(newBody);
             }
         } catch (Exception e) {
@@ -140,37 +146,90 @@ public class ExportWord {
 
     // --- HÀM MỚI: XỬ LÝ BẢNG ĐỂ DỊCH HTML ---
     private static void processTable(XWPFTable table, Map<String, String> dataMap) {
-        // Duyệt ngược từ dưới lên để khi thêm/xóa dòng không bị lỗi lệch Index (IndexOutOfBounds)
-        for (int r = table.getRows().size() - 1; r >= 0; r--) {
-            XWPFTableRow row = table.getRow(r);
-            boolean isHtmlRow = false;
+        // === PASS 1: Tìm tất cả dòng có HTML placeholder, ghi nhớ index và value ===
+        // Phải dùng list snapshot vì sẽ modify bảng sau
+        List<Integer> htmlRowIndices = new java.util.ArrayList<>();
+        List<String> htmlRowValues = new java.util.ArrayList<>();
+
+        int totalRows;
+        try {
+            totalRows = table.getRows().size();
+        } catch (Exception e) {
+            System.err.println("[ExportWord] processTable: không đọc được số dòng bảng: " + e.getMessage());
+            return;
+        }
+
+        for (int r = 0; r < totalRows; r++) {
+            XWPFTableRow row;
+            try {
+                row = table.getRow(r);
+            } catch (Exception e) {
+                continue;
+            }
+            if (row == null) continue;
 
             for (XWPFTableCell cell : row.getTableCells()) {
                 String text = cell.getText();
-                for (Map.Entry<String, String> entry : dataMap.entrySet()) {
-                    // Nếu phát hiện thẻ placeholder chứa HTML (<tr>)
-                    if (text.contains(entry.getKey()) && entry.getValue() != null && entry.getValue().contains("<tr>")) {
-                        isHtmlRow = true;
-                        // Chèn các dòng Word mới dựa trên mã HTML
-                        insertHtmlRowsToTable(table, r, entry.getValue());
-                        break;
+                if (text == null) continue;
+
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("(<<.*?>>|\\{\\{.*?\\}\\})").matcher(text);
+                while (m.find()) {
+                    String key = m.group(1);
+                    if (dataMap.containsKey(key)) {
+                        String value = dataMap.get(key);
+                        if (value != null && value.contains("<tr>")) {
+                            htmlRowIndices.add(r);
+                            htmlRowValues.add(value);
+                            break;
+                        }
                     }
                 }
-                if (isHtmlRow) break;
+                if (!htmlRowIndices.isEmpty() && htmlRowIndices.get(htmlRowIndices.size() - 1) == r) break;
             }
+        }
 
-            if (isHtmlRow) {
-                // Xóa bỏ cái dòng chứa từ khóa <<rows_...>> đi
-                table.removeRow(r);
-            } else {
-                // Nếu là dòng chữ bình thường, thay thế text như cũ
-                for (XWPFTableCell cell : row.getTableCells()) {
-                    for (XWPFParagraph paragraph : cell.getParagraphs()) {
-                        replaceTextInParagraph(paragraph, dataMap);
-                    }
+        // === PASS 2: Thay thế text bình thường trong tất cả dòng KHÔNG phải HTML ===
+        // (trước khi modify structure)
+        for (int r = 0; r < totalRows; r++) {
+            if (htmlRowIndices.contains(r)) continue;
+            XWPFTableRow row;
+            try {
+                row = table.getRow(r);
+            } catch (Exception e) {
+                continue;
+            }
+            if (row == null) continue;
+            for (XWPFTableCell cell : row.getTableCells()) {
+                for (XWPFParagraph paragraph : cell.getParagraphs()) {
+                    replaceTextInParagraph(paragraph, dataMap);
                 }
             }
         }
+
+        // === PASS 3: Xử lý HTML rows - duyệt NGƯỢC để index không bị lệch khi xóa ===
+        for (int i = htmlRowIndices.size() - 1; i >= 0; i--) {
+            int rowIdx = htmlRowIndices.get(i);
+            String htmlValue = htmlRowValues.get(i);
+            try {
+                insertHtmlRowsToTable(table, rowIdx, htmlValue);
+                // Sau khi chèn, xóa dòng placeholder gốc (đã bị đẩy xuống 1 vị trí)
+                int deletedRowIdx = rowIdx + countHtmlRows(htmlValue);
+                table.removeRow(deletedRowIdx);
+            } catch (Exception ex) {
+                System.err.println("[ExportWord] processTable: bỏ qua HTML row " + rowIdx + ": " + ex.getMessage());
+            }
+        }
+    }
+
+    private static int countHtmlRows(String html) {
+        if (html == null) return 0;
+        int count = 0;
+        int idx = 0;
+        while ((idx = html.indexOf("<tr>", idx)) != -1) {
+            count++;
+            idx += 4;
+        }
+        return count;
     }
 
     // --- HÀM MỚI: BIẾN MÃ HTML THÀNH DÒNG CỦA BẢNG WORD ---
@@ -254,18 +313,23 @@ public class ExportWord {
         String replacedText = originalText;
         boolean found = false;
 
-        for (Map.Entry<String, String> entry : dataMap.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue() == null ? "" : entry.getValue();
-
-            if (replacedText.contains(key)) {
-                replacedText = replacedText.replace(key, value);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(<<.*?>>|\\{\\{.*?\\}\\})").matcher(originalText);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            String key = m.group(1);
+            if (dataMap.containsKey(key)) {
+                String value = dataMap.get(key) == null ? "" : dataMap.get(key);
+                m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(value));
                 found = true;
                 System.out.println("[ExportWord] replaceTextInParagraph: '" + key + "' -> '" + value + "'");
+            } else {
+                m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(key));
             }
         }
+        m.appendTail(sb);
 
         if (!found) return;
+        replacedText = sb.toString();
 
         // Xóa toàn bộ run cũ
         for (int i = runs.size() - 1; i >= 0; i--) {

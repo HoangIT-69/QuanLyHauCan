@@ -186,27 +186,47 @@ public class Step1_DocumentInfoPanelService {
                 }
             }
 
-            String sqlStep1 = "INSERT INTO step1_thong_tin (session_id, ten_van_kien, vi_tri_chi_huy, thoi_gian, map_1, map_2, map_3, map_4, ty_le, nam, chi_huy, nguoi_thay_the) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
-                    "ON DUPLICATE KEY UPDATE " +
-                    "ten_van_kien=VALUES(ten_van_kien), vi_tri_chi_huy=VALUES(vi_tri_chi_huy), thoi_gian=VALUES(thoi_gian), " +
-                    "map_1=VALUES(map_1), map_2=VALUES(map_2), map_3=VALUES(map_3), map_4=VALUES(map_4), " +
-                    "ty_le=VALUES(ty_le), nam=VALUES(nam), chi_huy=VALUES(chi_huy), nguoi_thay_the=VALUES(nguoi_thay_the)";
+            String sqlUpdate = "UPDATE step1_thong_tin SET " +
+                    "ten_van_kien=?, vi_tri_chi_huy=?, thoi_gian=?, " +
+                    "map_1=?, map_2=?, map_3=?, map_4=?, " +
+                    "ty_le=?, nam=?, chi_huy=?, nguoi_thay_the=? " +
+                    "WHERE session_id=?";
 
-            try (PreparedStatement pstmtStep1 = conn.prepareStatement(sqlStep1)) {
-                pstmtStep1.setInt(1, sessionId);
-                pstmtStep1.setString(2, tenVanKien);
-                pstmtStep1.setString(3, viTriChiHuy);
-                pstmtStep1.setString(4, thoiGian);
-                pstmtStep1.setString(5, map4[0]);
-                pstmtStep1.setString(6, map4[1]);
-                pstmtStep1.setString(7, map4[2]);
-                pstmtStep1.setString(8, map4[3]);
-                pstmtStep1.setString(9, tyLe);
-                pstmtStep1.setInt(10, nam);
-                pstmtStep1.setString(11, chiHuy);
-                pstmtStep1.setString(12, nguoiThayThe);
-                pstmtStep1.executeUpdate();
+            int updated;
+            try (PreparedStatement pstmtUpdate = conn.prepareStatement(sqlUpdate)) {
+                pstmtUpdate.setString(1, tenVanKien);
+                pstmtUpdate.setString(2, viTriChiHuy);
+                pstmtUpdate.setString(3, thoiGian);
+                pstmtUpdate.setString(4, map4[0]);
+                pstmtUpdate.setString(5, map4[1]);
+                pstmtUpdate.setString(6, map4[2]);
+                pstmtUpdate.setString(7, map4[3]);
+                pstmtUpdate.setString(8, tyLe);
+                pstmtUpdate.setInt(9, nam);
+                pstmtUpdate.setString(10, chiHuy);
+                pstmtUpdate.setString(11, nguoiThayThe);
+                pstmtUpdate.setInt(12, sessionId);
+                updated = pstmtUpdate.executeUpdate();
+            }
+
+            if (updated == 0) {
+                String sqlInsert = "INSERT INTO step1_thong_tin (session_id, ten_van_kien, vi_tri_chi_huy, thoi_gian, map_1, map_2, map_3, map_4, ty_le, nam, chi_huy, nguoi_thay_the) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement pstmtInsert = conn.prepareStatement(sqlInsert)) {
+                    pstmtInsert.setInt(1, sessionId);
+                    pstmtInsert.setString(2, tenVanKien);
+                    pstmtInsert.setString(3, viTriChiHuy);
+                    pstmtInsert.setString(4, thoiGian);
+                    pstmtInsert.setString(5, map4[0]);
+                    pstmtInsert.setString(6, map4[1]);
+                    pstmtInsert.setString(7, map4[2]);
+                    pstmtInsert.setString(8, map4[3]);
+                    pstmtInsert.setString(9, tyLe);
+                    pstmtInsert.setInt(10, nam);
+                    pstmtInsert.setString(11, chiHuy);
+                    pstmtInsert.setString(12, nguoiThayThe);
+                    pstmtInsert.executeUpdate();
+                }
             }
 
             return newId != null ? SaveResult.ok(newId) : SaveResult.okNoNewSession();

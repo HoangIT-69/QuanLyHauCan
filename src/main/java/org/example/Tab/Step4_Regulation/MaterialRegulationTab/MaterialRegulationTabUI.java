@@ -472,7 +472,7 @@ public class MaterialRegulationTabUI extends JPanel {
             }
         }
         if (idx != -1) {
-            model.insertRow(idx, new Object[]{data.name, data.dvt, "0", "0", "0", "0", "0"});
+            model.insertRow(idx, new Object[]{data.name, data.dvt, "", "", "", "", ""});
         }
     }
 }

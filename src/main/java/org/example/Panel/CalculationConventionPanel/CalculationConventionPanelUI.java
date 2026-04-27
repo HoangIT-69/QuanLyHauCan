@@ -17,7 +17,8 @@ public class CalculationConventionPanelUI extends JPanel {
     private DefaultTableModel modelVatChat;
     private JTable tableVatChat;
     private JComboBox<String> cbDanhMucVC;
-    private JTextField txtTenVC, txtQuyUocVC, txtDonViQuyUocVC, txtDVTinhVC;
+    private JComboBox<String> cbDVTinhVC;
+    private JTextField txtTenVC, txtQuyUocVC, txtDonViQuyUocVC;
     private int selectedIdVC = -1;
 
     private DefaultTableModel modelDan;
@@ -80,7 +81,10 @@ public class CalculationConventionPanelUI extends JPanel {
         txtQuyUocVC = new JTextField();
         InputValidator.restrictToNumbers(txtQuyUocVC, true);
         txtDonViQuyUocVC = new JTextField();
-        txtDVTinhVC = new JTextField();
+        cbDVTinhVC = new JComboBox<>(new String[]{
+                "Ngày", "%QS", "Túi", "Cuộn/người", "Bộ", "Cái"
+        });
+        cbDVTinhVC.setEditable(true);
 
         gbc.gridy = 0; gbc.gridx = 0; gbc.weightx = 0; formPanel.add(new JLabel("Danh mục:"), gbc);
         gbc.gridx = 1; cbDanhMucVC.setPreferredSize(new Dimension(200, 35)); formPanel.add(cbDanhMucVC, gbc);
@@ -94,7 +98,7 @@ public class CalculationConventionPanelUI extends JPanel {
         gbc.gridx = 3; txtDonViQuyUocVC.setPreferredSize(new Dimension(250, 35)); formPanel.add(txtDonViQuyUocVC, gbc);
 
         gbc.gridy = 2; gbc.gridx = 0; formPanel.add(new JLabel("Đơn vị tính chung:"), gbc);
-        gbc.gridx = 1; txtDVTinhVC.setPreferredSize(new Dimension(200, 35)); formPanel.add(txtDVTinhVC, gbc);
+        gbc.gridx = 1; cbDVTinhVC.setPreferredSize(new Dimension(200, 35)); formPanel.add(cbDVTinhVC, gbc);
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
         btnPanel.setOpaque(false);
@@ -128,7 +132,7 @@ public class CalculationConventionPanelUI extends JPanel {
                 txtTenVC.setText(modelVatChat.getValueAt(row, 2).toString());
                 txtQuyUocVC.setText(modelVatChat.getValueAt(row, 3).toString());
                 txtDonViQuyUocVC.setText(modelVatChat.getValueAt(row, 4).toString());
-                txtDVTinhVC.setText(modelVatChat.getValueAt(row, 5).toString());
+                cbDVTinhVC.setSelectedItem(modelVatChat.getValueAt(row, 5).toString());
             }
         });
 
@@ -140,7 +144,7 @@ public class CalculationConventionPanelUI extends JPanel {
             txtTenVC.setText("");
             txtQuyUocVC.setText("");
             txtDonViQuyUocVC.setText("");
-            txtDVTinhVC.setText("");
+            cbDVTinhVC.setSelectedIndex(0);
             tableVatChat.clearSelection();
         });
 
@@ -162,9 +166,10 @@ public class CalculationConventionPanelUI extends JPanel {
         }
         String danhMuc = cbDanhMucVC.getSelectedItem() != null ? cbDanhMucVC.getSelectedItem().toString() : "";
         float quyUoc = conventionService.parseQuyUocFromText(txtQuyUocVC.getText());
+        String dvtChung = cbDVTinhVC.getSelectedItem() != null ? cbDVTinhVC.getSelectedItem().toString() : "";
         boolean ok = isNew
-                ? conventionService.insertVatChat(danhMuc, txtTenVC.getText(), quyUoc, txtDonViQuyUocVC.getText(), txtDVTinhVC.getText())
-                : conventionService.updateVatChat(selectedIdVC, danhMuc, txtTenVC.getText(), quyUoc, txtDonViQuyUocVC.getText(), txtDVTinhVC.getText());
+                ? conventionService.insertVatChat(danhMuc, txtTenVC.getText(), quyUoc, txtDonViQuyUocVC.getText(), dvtChung)
+                : conventionService.updateVatChat(selectedIdVC, danhMuc, txtTenVC.getText(), quyUoc, txtDonViQuyUocVC.getText(), dvtChung);
         if (ok) {
             loadDataVatChat();
             JOptionPane.showMessageDialog(this, "Lưu dữ liệu thành công!");
@@ -183,7 +188,7 @@ public class CalculationConventionPanelUI extends JPanel {
             txtTenVC.setText("");
             txtQuyUocVC.setText("");
             txtDonViQuyUocVC.setText("");
-            txtDVTinhVC.setText("");
+            cbDVTinhVC.setSelectedIndex(0);
         }
     }
 

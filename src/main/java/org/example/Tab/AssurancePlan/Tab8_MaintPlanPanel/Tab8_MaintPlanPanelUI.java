@@ -20,15 +20,13 @@ public class Tab8_MaintPlanPanelUI extends JPanel {
     private JTextArea txtBdChuanBi, txtBdChienDau, txtBdSau;
     private DefaultTableModel modelSuaChua;
     private JTable tblSuaChua;
-    private JTextArea txtScCanDoi, txtScChuanBi, txtScChienDau, txtScSau;
+    private JTextArea txtScChuanBi, txtScChienDau, txtScSau;
 
     private boolean isCalculating = false;
     private int currentSessionId = -1;
 
     // 12 Dòng cố định theo mẫu
     private final String[][] FIXED_ROWS = {
-            {"I", "GĐ CBCĐ"},
-            {"II", "GĐ THCĐ"},
             {"1", "SMPK 12,7mm"},
             {"2", "Cối 100mm"},
             {"3", "Cối 82mm"},
@@ -87,10 +85,8 @@ public class Tab8_MaintPlanPanelUI extends JPanel {
         mainContainer.add(createSuaChuaTable());
         mainContainer.add(Box.createVerticalStrut(15));
 
-        txtScCanDoi = AssurancePlanUiUtils.createModernTextArea();
-        mainContainer.add(UIUtils.createSubSectionLabel("b) Biện pháp - Cân đối:"));
-        mainContainer.add(AssurancePlanUiUtils.scrollBorderedTextArea(txtScCanDoi, 80));
-        mainContainer.add(Box.createVerticalStrut(15));
+        mainContainer.add(UIUtils.createSubSectionLabel("b) Biện pháp:"));
+        mainContainer.add(Box.createVerticalStrut(10));
 
         txtScChuanBi = AssurancePlanUiUtils.createModernTextArea();
         mainContainer.add(UIUtils.createSubSectionLabel("* Giai đoạn chuẩn bị:"));
@@ -139,7 +135,9 @@ public class Tab8_MaintPlanPanelUI extends JPanel {
         modelSuaChua = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return (column >= 2 && column <= 7) || column == 9 || column == 10;
+                if (row < 2) return false;
+                // Chỉ cho sửa Số lượng (2), Tỷ lệ (3), và Khả năng sửa chữa Nhẹ/Vừa (9, 10)
+                return column == 2 || column == 3 || column == 9 || column == 10;
             }
         };
 
@@ -201,10 +199,16 @@ public class Tab8_MaintPlanPanelUI extends JPanel {
             int tongHuHong = (int) Math.round(soLuong * tiLe / 100.0);
             modelSuaChua.setValueAt(tongHuHong > 0 ? String.valueOf(tongHuHong) : "0", row, 8);
 
-            int huNhe = parseSafeInt(modelSuaChua.getValueAt(row, 4));
-            int huVua = parseSafeInt(modelSuaChua.getValueAt(row, 5));
-            int huNang = parseSafeInt(modelSuaChua.getValueAt(row, 6));
-            int huHuy = parseSafeInt(modelSuaChua.getValueAt(row, 7));
+            // Tự động tính Nhẹ (50%), Vừa (25%), Nặng (15%), Hủy (10%)
+            int huNhe = (int) Math.round(tongHuHong * 0.50);
+            int huVua = (int) Math.round(tongHuHong * 0.25);
+            int huNang = (int) Math.round(tongHuHong * 0.15);
+            int huHuy = tongHuHong - huNhe - huVua - huNang; // Khớp tổng
+
+            modelSuaChua.setValueAt(huNhe > 0 ? String.valueOf(huNhe) : "0", row, 4);
+            modelSuaChua.setValueAt(huVua > 0 ? String.valueOf(huVua) : "0", row, 5);
+            modelSuaChua.setValueAt(huNang > 0 ? String.valueOf(huNang) : "0", row, 6);
+            modelSuaChua.setValueAt(huHuy > 0 ? String.valueOf(huHuy) : "0", row, 7);
 
             int suaNhe = parseSafeInt(modelSuaChua.getValueAt(row, 9));
             int suaVua = parseSafeInt(modelSuaChua.getValueAt(row, 10));
@@ -303,7 +307,8 @@ public class Tab8_MaintPlanPanelUI extends JPanel {
             service.loadFromDatabase(sessionId, modelSuaChua, this);
         } finally {
             isCalculating = false;
-            for (int i = 2; i < 12; i++) {
+            int rowCount = modelSuaChua.getRowCount();
+            for (int i = 0; i < rowCount; i++) {
                 recalculateRow(i);
             }
         }
@@ -316,15 +321,15 @@ public class Tab8_MaintPlanPanelUI extends JPanel {
         data.put("{{bao_duong_kt_chien_dau}}", txtBdChienDau.getText().trim());
         data.put("{{bao_duong_kt_sau}}", txtBdSau.getText().trim());
 
-        data.put("{{can_doi_sua_chua}}", txtScCanDoi.getText().trim());
         data.put("{{sua_chua_chuan_bi}}", txtScChuanBi.getText().trim());
         data.put("{{sua_chua_chien_dau}}", txtScChienDau.getText().trim());
         data.put("{{sua_chua_sau}}", txtScSau.getText().trim());
 
         String[] colKeys = {"sl", "tl", "hn", "hv", "hna", "hh", "ht", "sn", "sv", "st", "cn", "cv", "cna", "ch", "ct"};
 
-        for (int i = 0; i < 12; i++) {
-            int r = i + 1;
+        int rowCount = modelSuaChua.getRowCount();
+        for (int i = 0; i < rowCount; i++) {
+            int r = i + 1; // 1-based index for placeholder keys
             for (int c = 2; c <= 16; c++) {
                 data.put("{{sc_" + colKeys[c-2] + "_" + r + "}}", getVal(i, c));
             }

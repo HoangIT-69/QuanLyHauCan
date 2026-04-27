@@ -307,7 +307,9 @@ public class RegulationDetailDialogUI extends JDialog {
     }
 
     private static String formatCellFromStore(String s) {
+        if (s == null || s.trim().isEmpty()) return "";
         double v = InputValidator.parseDoubleSafe(s);
+        if (v == 0) return "";
         return formatDisplay(v);
     }
 

@@ -85,6 +85,7 @@ public class Step1_DocumentInfoPanelUI extends JPanel {
 
         btnNext.addActionListener(e -> {
             if (validateInputs()) {
+                saveToDatabase();
                 parent.navigateStep(2);
             }
         });

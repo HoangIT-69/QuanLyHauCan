@@ -10,6 +10,7 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +21,6 @@ public class Tab7_MedPlanPanelUI extends JPanel {
 
     private DefaultTableModel modelQuanY;
     private JTable tblQuanY;
-    private JTextArea txtCanDoi;
     private JTextArea txtChuanBi;
     private JTextArea txtChienDau;
     private JTextArea txtVeSinh;
@@ -54,15 +54,8 @@ public class Tab7_MedPlanPanelUI extends JPanel {
         mainContainer.add(createQuanYTable());
         mainContainer.add(Box.createVerticalStrut(25));
 
-        // 2. Cân đối
-        mainContainer.add(UIUtils.createSectionLabel("2. Cân đối"));
-        txtCanDoi = AssurancePlanUiUtils.createModernTextArea();
-        mainContainer.add(Box.createVerticalStrut(10));
-        mainContainer.add(AssurancePlanUiUtils.scrollBorderedTextArea(txtCanDoi, 100));
-        mainContainer.add(Box.createVerticalStrut(25));
-
-        // 3. Ý định bảo đảm
-        mainContainer.add(UIUtils.createSectionLabel("3. Ý định bảo đảm"));
+        // 2. Ý định bảo đảm
+        mainContainer.add(UIUtils.createSectionLabel("2. Ý định bảo đảm"));
         mainContainer.add(Box.createVerticalStrut(15));
 
         txtChuanBi = AssurancePlanUiUtils.createModernTextArea();
@@ -75,8 +68,8 @@ public class Tab7_MedPlanPanelUI extends JPanel {
         mainContainer.add(AssurancePlanUiUtils.scrollBorderedTextArea(txtChienDau, 80));
         mainContainer.add(Box.createVerticalStrut(25));
 
-        // 4. Vệ sinh phòng bệnh
-        mainContainer.add(UIUtils.createSectionLabel("4. Vệ sinh phòng bệnh, phòng dịch"));
+        // 3. Vệ sinh phòng bệnh
+        mainContainer.add(UIUtils.createSectionLabel("3. Vệ sinh phòng bệnh, phòng dịch"));
         txtVeSinh = AssurancePlanUiUtils.createModernTextArea();
         mainContainer.add(Box.createVerticalStrut(10));
         mainContainer.add(AssurancePlanUiUtils.scrollBorderedTextArea(txtVeSinh, 100));
@@ -121,6 +114,7 @@ public class Tab7_MedPlanPanelUI extends JPanel {
                     } finally {
                         isCalculating = false;
                     }
+                    autoFillLastEmptyRow();
                 } else if (col == 1 || col == 2 || col == 4) {
                     isCalculating = true;
                     try {
@@ -130,6 +124,7 @@ public class Tab7_MedPlanPanelUI extends JPanel {
                     } finally {
                         isCalculating = false;
                     }
+                    autoFillLastEmptyRow();
                 }
             }
         });
@@ -181,6 +176,87 @@ public class Tab7_MedPlanPanelUI extends JPanel {
             modelQuanY.addRow(new Object[]{"  " + h, "", "", "", "", "", "", "", "", ""});
         }
         modelQuanY.addRow(new Object[]{"TB ngày cao nhất", "", "", "", "", "", "", "", "", ""});
+    }
+
+    /**
+     * Nếu chỉ còn đúng 1 dòng hướng chưa điền TL%, tự tính SN và TL% cho dòng đó
+     * = (Tổng TB toàn trận SN) - (Tổng SN các dòng khác).
+     */
+    private void autoFillLastEmptyRow() {
+        int toanTranRow = -1;
+        List<Integer> directionRows = new ArrayList<>();
+
+        for (int r = 0; r < modelQuanY.getRowCount(); r++) {
+            Object v = modelQuanY.getValueAt(r, 0);
+            String name = v != null ? v.toString().trim() : "";
+            if (name.startsWith("TB toàn trận")) {
+                toanTranRow = r;
+            } else if (!name.startsWith("TB ngày cao nhất")) {
+                directionRows.add(r);
+            }
+        }
+
+        if (toanTranRow < 0 || directionRows.isEmpty()) return;
+
+        // 1. Xử lý cột Thương binh (col 2/3)
+        List<Integer> unfilledTb = new ArrayList<>();
+        for (int r : directionRows) {
+            if (parseTiLePhanTram(modelQuanY.getValueAt(r, 2)) == 0) {
+                unfilledTb.add(r);
+            }
+        }
+
+        if (unfilledTb.size() == 1) {
+            int emptyRow = unfilledTb.get(0);
+            int emptyQS = parseQuanSo(modelQuanY.getValueAt(emptyRow, 1));
+            int totalSnTb = parseQuanSo(modelQuanY.getValueAt(toanTranRow, 3));
+            if (emptyQS > 0 && totalSnTb > 0) {
+                int sumSnTb = 0;
+                for (int r : directionRows) {
+                    if (r != emptyRow) sumSnTb += parseQuanSo(modelQuanY.getValueAt(r, 3));
+                }
+                int remainSnTb = Math.max(0, totalSnTb - sumSnTb);
+                double tlTb = remainSnTb * 100.0 / emptyQS;
+
+                isCalculating = true;
+                try {
+                    modelQuanY.setValueAt(String.format("%.0f", tlTb), emptyRow, 2);
+                    calculateRow(emptyRow);
+                } finally {
+                    isCalculating = false;
+                }
+            }
+        }
+
+        // 2. Xử lý cột Bệnh binh (col 4/5)
+        List<Integer> unfilledBb = new ArrayList<>();
+        for (int r : directionRows) {
+            if (parseTiLePhanTram(modelQuanY.getValueAt(r, 4)) == 0) {
+                unfilledBb.add(r);
+            }
+        }
+
+        if (unfilledBb.size() == 1) {
+            int emptyRow = unfilledBb.get(0);
+            int emptyQS = parseQuanSo(modelQuanY.getValueAt(emptyRow, 1));
+            int totalSnBb = parseQuanSo(modelQuanY.getValueAt(toanTranRow, 5));
+            if (emptyQS > 0 && totalSnBb > 0) {
+                int sumSnBb = 0;
+                for (int r : directionRows) {
+                    if (r != emptyRow) sumSnBb += parseQuanSo(modelQuanY.getValueAt(r, 5));
+                }
+                int remainSnBb = Math.max(0, totalSnBb - sumSnBb);
+                double tlBb = remainSnBb * 100.0 / emptyQS;
+
+                isCalculating = true;
+                try {
+                    modelQuanY.setValueAt(String.format("%.0f", tlBb), emptyRow, 4);
+                    calculateRow(emptyRow);
+                } finally {
+                    isCalculating = false;
+                }
+            }
+        }
     }
 
     private boolean isTbNgayCaoNhatRow(int row) {
@@ -341,22 +417,34 @@ public class Tab7_MedPlanPanelUI extends JPanel {
     // =========================================================================
     public Map<String, String> getExportData() {
         Map<String, String> data = new HashMap<>();
-
+        
+        final int MAX_ROWS = 7; // Co dinh 7 dong: Toan tran + 5 huong + Ngay cao nhat
         int rowCount = modelQuanY.getRowCount();
-        for (int i = 0; i < rowCount; i++) {
+        for (int i = 0; i < MAX_ROWS; i++) {
             int r = i + 1;
-            data.put("<<qy_qs_" + r + ">>", getVal(i, 1));
-            data.put("<<qy_tb_tl_" + r + ">>", getVal(i, 2));
-            data.put("<<qy_tb_sn_" + r + ">>", getVal(i, 3));
-            data.put("<<qy_bb_tl_" + r + ">>", getVal(i, 4));
-            data.put("<<qy_bb_sn_" + r + ">>", getVal(i, 5));
-            data.put("<<qy_tong_" + r + ">>", getVal(i, 6));
-            data.put("<<qy_cang_" + r + ">>", getVal(i, 7));
-            data.put("<<qy_tudi_" + r + ">>", getVal(i, 8));
-            data.put("<<qy_nc_tong_" + r + ">>", getVal(i, 9));
+            if (i < rowCount) {
+                data.put("<<qy_qs_" + r + ">>", getVal(i, 1));
+                data.put("<<qy_tb_tl_" + r + ">>", getVal(i, 2));
+                data.put("<<qy_tb_sn_" + r + ">>", getVal(i, 3));
+                data.put("<<qy_bb_tl_" + r + ">>", getVal(i, 4));
+                data.put("<<qy_bb_sn_" + r + ">>", getVal(i, 5));
+                data.put("<<qy_tong_" + r + ">>", getVal(i, 6));
+                data.put("<<qy_cang_" + r + ">>", getVal(i, 7));
+                data.put("<<qy_tudi_" + r + ">>", getVal(i, 8));
+                data.put("<<qy_nc_tong_" + r + ">>", getVal(i, 9));
+            } else {
+                data.put("<<qy_qs_" + r + ">>", "");
+                data.put("<<qy_tb_tl_" + r + ">>", "");
+                data.put("<<qy_tb_sn_" + r + ">>", "");
+                data.put("<<qy_bb_tl_" + r + ">>", "");
+                data.put("<<qy_bb_sn_" + r + ">>", "");
+                data.put("<<qy_tong_" + r + ">>", "");
+                data.put("<<qy_cang_" + r + ">>", "");
+                data.put("<<qy_tudi_" + r + ">>", "");
+                data.put("<<qy_nc_tong_" + r + ">>", "");
+            }
         }
 
-        data.put("<<can_doi_quan_y>>", txtCanDoi.getText().trim());
         data.put("<<quany_chuan_bi>>", txtChuanBi.getText().trim());
         data.put("<<quany_chien_dau>>", txtChienDau.getText().trim());
         data.put("<<ve_sinh_phong_dich>>", txtVeSinh.getText().trim());

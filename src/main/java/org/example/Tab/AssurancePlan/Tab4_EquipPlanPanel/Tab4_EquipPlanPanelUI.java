@@ -76,6 +76,8 @@ public class Tab4_EquipPlanPanelUI extends JPanel {
         add(AssurancePlanUiUtils.wrapVerticalScroll(mainContainer), BorderLayout.CENTER);
     }
 
+    private boolean isCalculating = false;
+
     private JPanel createTablePanel() {
         JPanel pnl = new JPanel(new BorderLayout(0, 10));
         pnl.setBackground(Color.WHITE);
@@ -93,7 +95,24 @@ public class Tab4_EquipPlanPanelUI extends JPanel {
 
         model = new DefaultTableModel(columnNames, 0) {
             @Override
-            public boolean isCellEditable(int row, int column) { return column > 2; } // Khóa 3 cột đầu
+            public boolean isCellEditable(int row, int column) {
+                // Lock Unit, Name, DVT, Kbđ, Kt, Supplement Qty
+                return column == 3 || column == 4 || column == 5 || column == 8 || column == 10 || column == 11 || column == 12;
+            }
+
+            @Override
+            public void setValueAt(Object aValue, int row, int column) {
+                if (isCalculating) {
+                    super.setValueAt(aValue, row, column);
+                    return;
+                }
+                super.setValueAt(aValue, row, column);
+                if (column == 3 || column == 4 || column == 5 || column == 8) {
+                    isCalculating = true;
+                    recalculateRow(row);
+                    isCalculating = false;
+                }
+            }
         };
 
         // KHỞI TẠO 55 DÒNG CỐ ĐỊNH (5 nhóm x 11 vũ khí)
@@ -139,11 +158,41 @@ public class Tab4_EquipPlanPanelUI extends JPanel {
         pnl.add(combinedTablePanel, BorderLayout.CENTER);
 
         btnRefresh.addActionListener(e -> {
-            if (this.currentSessionId > 0) loadDataFromDatabase(this.currentSessionId);
+            if (this.currentSessionId > 0) {
+                isCalculating = true;
+                loadDataFromDatabase(this.currentSessionId);
+                for (int i = 0; i < model.getRowCount(); i++) recalculateRow(i);
+                isCalculating = false;
+            }
             else JOptionPane.showMessageDialog(this, "Chưa có phiên làm việc hợp lệ!", "Cảnh báo", JOptionPane.WARNING_MESSAGE);
         });
 
         return pnl;
+    }
+
+    private void recalculateRow(int row) {
+        double nhuCau = parseDouble(model.getValueAt(row, 3));
+        double tongSo = parseDouble(model.getValueAt(row, 4));
+        double soTot = parseDouble(model.getValueAt(row, 5));
+        double phaiCo = parseDouble(model.getValueAt(row, 8));
+
+        double kbd = nhuCau > 0 ? tongSo / nhuCau : 1.0;
+        double kt = tongSo > 0 ? soTot / tongSo : 1.0;
+        double soLuongBS = Math.max(0, phaiCo - soTot);
+
+        model.setValueAt(formatDouble(kbd), row, 6);
+        model.setValueAt(formatDouble(kt), row, 7);
+        model.setValueAt(soLuongBS > 0 ? formatDouble(soLuongBS) : "", row, 9);
+    }
+
+    private double parseDouble(Object v) {
+        if (v == null || v.toString().isEmpty()) return 0;
+        try { return Double.parseDouble(v.toString().replace(",", ".")); } catch (Exception e) { return 0; }
+    }
+
+    private String formatDouble(double d) {
+        if (d == (long) d) return String.format("%d", (long) d);
+        return String.format("%.2f", d).replace(".", ",");
     }
     public void loadDataFromDatabase(int sessionId) {
         this.currentSessionId = sessionId;

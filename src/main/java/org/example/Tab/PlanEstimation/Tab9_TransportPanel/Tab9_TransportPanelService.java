@@ -92,35 +92,61 @@ public class Tab9_TransportPanelService {
         if (sessionId < 1) {
             return s;
         }
-        try (Connection conn = DBConnection.getConnection()) {
-            if (conn == null) {
-                return s;
-            }
-            String sumSql = "SELECT COALESCE(SUM(tieu_thu_gdcb), 0) AS sdcb, COALESCE(SUM(tieu_thu_gdcd), 0) AS sdcd "
-                    + "FROM step4_quy_dinh_du_tru WHERE session_id = ?";
-            try (PreparedStatement ps = conn.prepareStatement(sumSql)) {
-                ps.setInt(1, sessionId);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        s.sumTieuThuGdcb = rs.getDouble("sdcb");
-                        s.sumTieuThuGdcd = rs.getDouble("sdcd");
-                    }
-                }
-            }
 
-            String riceSql = "SELECT vat_chat, tieu_thu_gdcb, tieu_thu_gdcd FROM step4_quy_dinh_du_tru "
-                    + "WHERE session_id = ? AND loai_vat_chat = 2 ORDER BY id ASC";
-            try (PreparedStatement ps = conn.prepareStatement(riceSql)) {
-                ps.setInt(1, sessionId);
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        String ten = rs.getString("vat_chat");
-                        if (!isRiceLike(ten)) {
-                            continue;
+        // 1. Kiểm tra và tự động load dữ liệu nếu các bản đồ toàn cục đang trống
+        java.util.Map<String, Double> danData = org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getGlobalTonnageDataReadOnly();
+        if (danData.isEmpty()) {
+            new org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService().getDanTableModel(sessionId);
+            danData = org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getGlobalTonnageDataReadOnly();
+        }
+
+        java.util.Map<String, java.util.Map<String, Double>> vchcByCat = org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getGlobalTonnageVCHC_ByCatReadOnly();
+        if (vchcByCat.isEmpty()) {
+            javax.swing.table.DefaultTableModel dummyModel = new javax.swing.table.DefaultTableModel(0, 27);
+            new org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService().loadDataFromDatabase(sessionId, 1, dummyModel);
+            vchcByCat = org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getGlobalTonnageVCHC_ByCatReadOnly();
+        }
+
+        double danGdcb = danData.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_DV, 0.0)
+                       + danData.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_KHO, 0.0);
+        double danGdcd = danData.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_THUC_HANH, 0.0);
+        double vchcGdcb = 0;
+        double vchcGdcd = 0;
+
+        String[] cats = {
+            org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.CAT_QN,
+            org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.CAT_QY,
+            org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.CAT_DT,
+            org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.CAT_VTKT
+        };
+
+        for (String cat : cats) {
+            java.util.Map<String, Double> m = vchcByCat.getOrDefault(cat, java.util.Collections.emptyMap());
+            vchcGdcb += m.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_GDCB, 0.0);
+            vchcGdcd += m.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_GDCD, 0.0);
+        }
+
+        // 3. Gán vào snapshot (Khối lượng bổ sung = Đạn + VTKT + QN + QY + DT)
+        s.sumTieuThuGdcb = danGdcb + vchcGdcb;
+        s.sumTieuThuGdcd = danGdcd + vchcGdcd;
+
+        // 4. Giữ nguyên logic lấy số ngày GĐCB/GĐCĐ từ bảng step4 (dòng Gạo/Lương thực)
+        try (Connection conn = DBConnection.getConnection()) {
+            if (conn != null) {
+                String riceSql = "SELECT vat_chat, tieu_thu_gdcb, tieu_thu_gdcd FROM step4_quy_dinh_du_tru "
+                        + "WHERE session_id = ? AND loai_vat_chat = 2 ORDER BY id ASC";
+                try (PreparedStatement ps = conn.prepareStatement(riceSql)) {
+                    ps.setInt(1, sessionId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String ten = rs.getString("vat_chat");
+                            if (!isRiceLike(ten)) {
+                                continue;
+                            }
+                            s.ngayAnGdcb = interpretAsDays(rs.getDouble("tieu_thu_gdcb"));
+                            s.ngayAnGdcd = interpretAsDays(rs.getDouble("tieu_thu_gdcd"));
+                            break;
                         }
-                        s.ngayAnGdcb = interpretAsDays(rs.getDouble("tieu_thu_gdcb"));
-                        s.ngayAnGdcd = interpretAsDays(rs.getDouble("tieu_thu_gdcd"));
-                        break;
                     }
                 }
             }
