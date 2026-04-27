@@ -1,115 +1,96 @@
 package org.example.Tab.PlanEstimation.Tab4_EquipmentPanel;
 
+import org.example.Utils.AssurancePlanUiUtils;
+import org.example.Utils.UIUtils;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
 import java.awt.*;
+import java.util.List;
 
+/**
+ * Tab IV — Trang bị kỹ thuật (Dự kiến kế hoạch).
+ * Trả lại code cũ sử dụng JTextArea và tự động sinh câu tóm tắt.
+ */
 public class Tab4_EquipmentPanelUI extends JPanel {
-    private final int sessionId;
+
     private final Tab4_EquipmentPanelService service;
+    private final int sessionId;
+
     private JTextArea txtChiTieu;
-    private JTextArea txtGiaiDoanChuanBi;
-    private JTextArea txtGiaiDoanChienDau;
+    private JTextArea txtChuanBi;
+    private JTextArea txtChienDau;
 
     public Tab4_EquipmentPanelUI(int sessionId, Tab4_EquipmentPanelService service) {
         this.sessionId = sessionId;
         this.service = service != null ? service : new Tab4_EquipmentPanelService();
 
-        setLayout(new BorderLayout(0, 15));
+        setLayout(new BorderLayout());
         setBackground(Color.WHITE);
-        setBorder(new EmptyBorder(20, 30, 20, 30));
 
-        JLabel lblTitle = new JLabel("IV. BẢO ĐẢM VŨ KHÍ TRANG BỊ KỸ THUẬT");
+        JPanel mainContainer = new JPanel();
+        mainContainer.setLayout(new BoxLayout(mainContainer, BoxLayout.Y_AXIS));
+        mainContainer.setBackground(Color.WHITE);
+        mainContainer.setBorder(new EmptyBorder(20, 30, 20, 30));
+
+        JLabel lblTitle = new JLabel("IV. TRANG BỊ KỸ THUẬT");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        lblTitle.setForeground(new Color(30, 41, 59));
-        add(lblTitle, BorderLayout.NORTH);
+        lblTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mainContainer.add(lblTitle);
+        mainContainer.add(Box.createVerticalStrut(20));
 
-        JPanel centerContainer = new JPanel(new GridLayout(3, 1, 0, 15));
-        centerContainer.setBackground(Color.WHITE);
+        // 1. Chỉ tiêu
+        mainContainer.add(UIUtils.createSectionLabel("1. Chỉ tiêu"));
+        mainContainer.add(Box.createVerticalStrut(10));
+        txtChiTieu = AssurancePlanUiUtils.createModernTextArea();
+        mainContainer.add(AssurancePlanUiUtils.scrollBorderedTextArea(txtChiTieu, 100));
+        mainContainer.add(Box.createVerticalStrut(20));
 
-        JPanel pnlPart1 = new JPanel(new BorderLayout(0, 5));
-        pnlPart1.setBackground(Color.WHITE);
-        pnlPart1.add(createSectionLabel("1. Chỉ tiêu"), BorderLayout.NORTH);
-        txtChiTieu = createStandardTextArea();
-        pnlPart1.add(createScrollPane(txtChiTieu), BorderLayout.CENTER);
+        // 2. Tiếp nhận, chuẩn bị
+        mainContainer.add(UIUtils.createSectionLabel("2. Tiếp nhận, chuẩn bị"));
+        mainContainer.add(Box.createVerticalStrut(10));
+        txtChuanBi = AssurancePlanUiUtils.createModernTextArea();
+        mainContainer.add(AssurancePlanUiUtils.scrollBorderedTextArea(txtChuanBi, 100));
+        mainContainer.add(Box.createVerticalStrut(20));
 
-        JPanel pnlPart2 = new JPanel(new BorderLayout(0, 5));
-        pnlPart2.setBackground(Color.WHITE);
-        JPanel pnlTitle2 = new JPanel(new GridLayout(2, 1));
-        pnlTitle2.setBackground(Color.WHITE);
-        pnlTitle2.add(createSectionLabel("2. Ý định tiếp nhận, bổ sung"));
-        pnlTitle2.add(createSubSectionLabel("* Giai đoạn chuẩn bị:"));
-        pnlPart2.add(pnlTitle2, BorderLayout.NORTH);
-        txtGiaiDoanChuanBi = createStandardTextArea();
-        pnlPart2.add(createScrollPane(txtGiaiDoanChuanBi), BorderLayout.CENTER);
+        // 3. Tiếp nhận trong chiến đấu
+        mainContainer.add(UIUtils.createSectionLabel("3. Tiếp nhận trong chiến đấu"));
+        mainContainer.add(Box.createVerticalStrut(10));
+        txtChienDau = AssurancePlanUiUtils.createModernTextArea();
+        mainContainer.add(AssurancePlanUiUtils.scrollBorderedTextArea(txtChienDau, 100));
 
-        JPanel pnlPart3 = new JPanel(new BorderLayout(0, 5));
-        pnlPart3.setBackground(Color.WHITE);
-        pnlPart3.add(createSubSectionLabel("* Giai đoạn chiến đấu:"), BorderLayout.NORTH);
-        txtGiaiDoanChienDau = createStandardTextArea();
-        pnlPart3.add(createScrollPane(txtGiaiDoanChienDau), BorderLayout.CENTER);
+        add(AssurancePlanUiUtils.wrapVerticalScroll(mainContainer), BorderLayout.CENTER);
 
-        centerContainer.add(pnlPart1);
-        centerContainer.add(pnlPart2);
-        centerContainer.add(pnlPart3);
-
-        add(centerContainer, BorderLayout.CENTER);
-
-        reloadFromDatabase();
+        loadData();
     }
 
-    public void reloadFromDatabase() {
+    private void loadData() {
         Tab4_EquipmentPanelService.Tab4Fields f = new Tab4_EquipmentPanelService.Tab4Fields();
         service.loadInto(f, sessionId);
+
         txtChiTieu.setText(f.chiTieu);
-        txtGiaiDoanChuanBi.setText(f.chuanBi);
-        txtGiaiDoanChienDau.setText(f.chienDau);
+        txtChuanBi.setText(f.chuanBi);
+        txtChienDau.setText(f.chienDau);
+
+        // Nếu chi tiêu trống, tự động sinh văn bản tóm tắt
+        if (f.chiTieu == null || f.chiTieu.trim().isEmpty()) {
+            generateAutoChiTieu();
+        }
+    }
+
+    private void generateAutoChiTieu() {
+        String summary = service.generateSummaryText(sessionId);
+        if (!summary.isEmpty()) {
+            txtChiTieu.setText(summary);
+        }
     }
 
     public void persistToDatabase() {
-        service.save(sessionId, getChiTieu(), getChuanBi(), getChienDau());
+        service.save(sessionId, txtChiTieu.getText(), txtChuanBi.getText(), txtChienDau.getText());
     }
 
-    private JLabel createSectionLabel(String text) {
-        JLabel lbl = new JLabel(text);
-        lbl.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        lbl.setForeground(new Color(41, 128, 185));
-        return lbl;
-    }
-
-    private JLabel createSubSectionLabel(String text) {
-        JLabel lbl = new JLabel(text);
-        lbl.setFont(new Font("Segoe UI", Font.BOLD | Font.ITALIC, 14));
-        lbl.setForeground(new Color(71, 85, 105));
-        return lbl;
-    }
-
-    private JTextArea createStandardTextArea() {
-        JTextArea txt = new JTextArea();
-        txt.setFont(new Font("Segoe UI", Font.PLAIN, 15));
-        txt.setLineWrap(true);
-        txt.setWrapStyleWord(true);
-        txt.setBorder(new EmptyBorder(10, 10, 10, 10));
-        return txt;
-    }
-
-    private JScrollPane createScrollPane(JTextArea textArea) {
-        JScrollPane scroll = new JScrollPane(textArea);
-        scroll.setBorder(new LineBorder(new Color(200, 200, 200), 1));
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
-        return scroll;
-    }
-
-    public String getChiTieu() {
-        return txtChiTieu.getText().trim();
-    }
-
-    public String getChuanBi() {
-        return txtGiaiDoanChuanBi.getText().trim();
-    }
-
-    public String getChienDau() {
-        return txtGiaiDoanChienDau.getText().trim();
-    }
+    // Getters for Word Export
+    public String getChiTieu() { return txtChiTieu.getText(); }
+    public String getChuanBi() { return txtChuanBi.getText(); }
+    public String getChienDau() { return txtChienDau.getText(); }
 }

@@ -22,6 +22,11 @@ public class Tab9_TransportPanel extends JPanel {
     private JScrollPane scrollKeHoach;
     private boolean isRecalculatingKeHoach = false;
 
+    // Biện pháp bảo đảm
+    private JTextArea txtBpChuanBi;
+    private JTextArea txtBpChienDau;
+    private JTextArea txtBpSauChienDau;
+
     private final Tab9_TransportService service = new Tab9_TransportService();
 
     private final int sessionId;
@@ -95,6 +100,26 @@ public class Tab9_TransportPanel extends JPanel {
         
         pnlKeHoach = createKeHoachTable();
         mainContainer.add(pnlKeHoach);
+        mainContainer.add(Box.createVerticalStrut(25));
+
+        // 4. Biện pháp bảo đảm
+        mainContainer.add(UIUtils.createSectionLabel("4. Biện pháp bảo đảm"));
+        mainContainer.add(Box.createVerticalStrut(10));
+        
+        mainContainer.add(UIUtils.createSubSectionLabel("- Giai đoạn chuẩn bị:"));
+        txtBpChuanBi = createModernTextArea();
+        mainContainer.add(createTextAreaScrollWithBorder(txtBpChuanBi, 100));
+        mainContainer.add(Box.createVerticalStrut(10));
+        
+        mainContainer.add(UIUtils.createSubSectionLabel("- Giai đoạn chiến đấu:"));
+        txtBpChienDau = createModernTextArea();
+        mainContainer.add(createTextAreaScrollWithBorder(txtBpChienDau, 100));
+        mainContainer.add(Box.createVerticalStrut(10));
+        
+        mainContainer.add(UIUtils.createSubSectionLabel("- Sau chiến đấu:"));
+        txtBpSauChienDau = createModernTextArea();
+        mainContainer.add(createTextAreaScrollWithBorder(txtBpSauChienDau, 100));
+        mainContainer.add(Box.createVerticalStrut(25));
 
         JScrollPane mainScroll = new JScrollPane(mainContainer);
         mainScroll.setBorder(null);
@@ -139,7 +164,7 @@ public class Tab9_TransportPanel extends JPanel {
         pnl.setMaximumSize(new Dimension(1300, 450));
         pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        int[] w = {40, 200, 70, 70, 70, 70, 70, 70, 70, 90, 90, 70, 120};
+        int[] w = {40, 200, 60, 60, 60, 60, 60, 60, 60, 90, 70, 70, 120};
         String[] cols = new String[13]; for (int i=0; i<13; i++) cols[i] = "";
 
         modelKhoiLuong = new DefaultTableModel(cols, 0) {
@@ -147,22 +172,26 @@ public class Tab9_TransportPanel extends JPanel {
             public boolean isCellEditable(int row, int column) {
                 // Khóa cột TT và Nội dung, và các cột tự động tính (+, Cộng)
                 if (column <= 1 || column == 4 || column == 8 || column == 10) return false;
-                
-                // Khóa các cột phân bổ bằng popup để người dùng không nhập tay (Đạn, VTKT, QN, QY, DT)
-                if (column == 2 || column == 3 || column == 5 || column == 6 || column == 7) return false;
-                
+
                 String nd = getValueAt(row, 1).toString();
+                boolean isKhoRow = nd.trim().equals("- Kho");
+
+                // Với các dòng phân bổ theo hướng: khóa cột phân bổ bằng popup (Đạn, VTKT, QN, QY, DT)
+                // Riêng dòng "Kho" cho phép nhập tay toàn bộ.
+                if (!isKhoRow && (column == 2 || column == 3 || column == 5 || column == 6 || column == 7)) return false;
+
                 return !nd.startsWith("Toàn trận") && !nd.startsWith("Giai đoạn") && !nd.startsWith("Đơn vị tính");
             }
         };
 
-        // --- ADD DỮ LIỆU CỨNG (ĐÃ SỬA THEO ẢNH 2) ---
+        // --- ADD DỮ LIỆU CỨNG (14 cột) ---
         modelKhoiLuong.addRow(new Object[]{"", "Đơn vị tính", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Tấn", "Người", ""});
         modelKhoiLuong.addRow(new Object[]{"", "Toàn trận", "", "", "", "", "", "", "", "", "", "", ""});
         modelKhoiLuong.addRow(new Object[]{"", "Giai đoạn chuẩn bị", "", "", "", "", "", "", "", "", "", "", ""});
         modelKhoiLuong.addRow(new Object[]{"", "  - Trên chuyển", "", "", "", "", "", "", "", "", "", "", ""});
         modelKhoiLuong.addRow(new Object[]{"", "  - Cấp mình", "", "", "", "", "", "", "", "", "", "", ""});
         modelKhoiLuong.addRow(new Object[]{"", "  - Dưới chuyển", "", "", "", "", "", "", "", "", "", "", ""});
+        modelKhoiLuong.addRow(new Object[]{"", "  - Kho", "", "", "", "", "", "", "", "", "", "", ""});
         modelKhoiLuong.addRow(new Object[]{"", "Giai đoạn chiến đấu", "", "", "", "", "", "", "", "", "", "", ""});
         modelKhoiLuong.addRow(new Object[]{"", "  - Trên chuyển", "", "", "", "", "", "", "", "", "", "", ""});
         modelKhoiLuong.addRow(new Object[]{"", "  - Cấp mình", "", "", "", "", "", "", "", "", "", "", ""});
@@ -194,14 +223,15 @@ public class Tab9_TransportPanel extends JPanel {
                     if (col == 2) { // Cột Đạn
                         Window window = SwingUtilities.getWindowAncestor(Tab9_TransportPanel.this);
                         if (window instanceof Frame) {
+                            java.util.List<String> dirs = service.getDanhSachHuong(sessionId);
                             if (row >= 3 && row <= 5) {
-                                Tab9_DanTransportUI dialog = new Tab9_DanTransportUI((Frame) window, "Giai đoạn chuẩn bị", row, danGdcbAssignments, updatedMap -> {
+                                Tab9_DanTransportUI dialog = new Tab9_DanTransportUI((Frame) window, "Giai đoạn chuẩn bị", row, danGdcbAssignments, dirs, updatedMap -> {
                                     danGdcbAssignments = updatedMap;
                                     updateDanWeightsFromAssignments(true);
                                 });
                                 dialog.setVisible(true);
-                            } else if (row >= 7 && row <= 9) {
-                                Tab9_DanTransportUI dialog = new Tab9_DanTransportUI((Frame) window, "Giai đoạn chiến đấu", row, danGdcdAssignments, updatedMap -> {
+                            } else if (row >= 8 && row <= 10) {
+                                Tab9_DanTransportUI dialog = new Tab9_DanTransportUI((Frame) window, "Giai đoạn chiến đấu", row, danGdcdAssignments, dirs, updatedMap -> {
                                     danGdcdAssignments = updatedMap;
                                     updateDanWeightsFromAssignments(false);
                                 });
@@ -216,19 +246,20 @@ public class Tab9_TransportPanel extends JPanel {
                             else if (col == 6) filterCategoryIndex = 1; // QY
                             else if (col == 7) filterCategoryIndex = 2; // DT
                             else if (col == 3) filterCategoryIndex = 3; // VTKT
-                            
+
                             final int fCatIdx = filterCategoryIndex;
+                            java.util.List<String> dirs = service.getDanhSachHuong(sessionId);
 
                             if (row >= 3 && row <= 5) {
                                 java.util.Map<String, Integer> currentAssignments = getVchcAssignmentMap(fCatIdx, true);
-                                org.example.Popup.Tab9_VCHCTransportDialog.Tab9_VCHCTransportUI dialog = new org.example.Popup.Tab9_VCHCTransportDialog.Tab9_VCHCTransportUI((Frame) window, "Giai đoạn chuẩn bị", row, fCatIdx, currentAssignments, updatedMap -> {
+                                org.example.Popup.Tab9_VCHCTransportDialog.Tab9_VCHCTransportUI dialog = new org.example.Popup.Tab9_VCHCTransportDialog.Tab9_VCHCTransportUI((Frame) window, "Giai đoạn chuẩn bị", row, fCatIdx, currentAssignments, dirs, updatedMap -> {
                                     setVchcAssignmentMap(fCatIdx, true, updatedMap);
                                     updateVchcWeightsFromAssignments(fCatIdx, col, true);
                                 });
                                 dialog.setVisible(true);
-                            } else if (row >= 7 && row <= 9) {
+                            } else if (row >= 8 && row <= 10) {
                                 java.util.Map<String, Integer> currentAssignments = getVchcAssignmentMap(fCatIdx, false);
-                                org.example.Popup.Tab9_VCHCTransportDialog.Tab9_VCHCTransportUI dialog = new org.example.Popup.Tab9_VCHCTransportDialog.Tab9_VCHCTransportUI((Frame) window, "Giai đoạn chiến đấu", row, fCatIdx, currentAssignments, updatedMap -> {
+                                org.example.Popup.Tab9_VCHCTransportDialog.Tab9_VCHCTransportUI dialog = new org.example.Popup.Tab9_VCHCTransportDialog.Tab9_VCHCTransportUI((Frame) window, "Giai đoạn chiến đấu", row, fCatIdx, currentAssignments, dirs, updatedMap -> {
                                     setVchcAssignmentMap(fCatIdx, false, updatedMap);
                                     updateVchcWeightsFromAssignments(fCatIdx, col, false);
                                 });
@@ -320,7 +351,6 @@ public class Tab9_TransportPanel extends JPanel {
         p.add(UIUtils.createAbsoluteHeaderLabel("Cộng", x[10], 30, w[10], 60));
 
         // L3
-        
         p.add(UIUtils.createAbsoluteHeaderLabel("Đạn", x[2], 60, w[2], 30));
         p.add(UIUtils.createAbsoluteHeaderLabel("VTKT", x[3], 60, w[3], 30));
         p.add(UIUtils.createAbsoluteHeaderLabel("+", x[4], 60, w[4], 30));
@@ -340,8 +370,8 @@ public class Tab9_TransportPanel extends JPanel {
         pnlKeHoach.setOpaque(false);
         pnlKeHoach.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        int[] w = {120, 80, 60, 70, 70, 80, 80, 60, 70, 70, 70, 70, 70, 70};
-        String[] cols = new String[14]; for (int i=0; i<14; i++) cols[i] = "";
+        int[] w = {40, 160, 120, 80, 80, 80, 50, 60, 80, 80, 70, 70};
+        String[] cols = new String[12]; for (int i=0; i<12; i++) cols[i] = "";
 
         modelKeHoach = new DefaultTableModel(cols, 0) {
             @Override
@@ -352,15 +382,8 @@ public class Tab9_TransportPanel extends JPanel {
                 // Khóa hoàn toàn cụm TỔNG SỐ (từ dòng 1 đến 10) vì đây là các dòng tự tính toán
                 if (row < 11) return false;
                 
-                // Khóa các cột 0 (Hướng), 1 (Giai đoạn), 3 (Chủng loại)
-                if (column == 0 || column == 1 || column == 3) return false;
-                
-                // Khóa các ô Merge ở các dòng con (chỉ cho nhập ở dòng đầu tiên của mỗi GĐ)
-                if (column == 2 || column == 5 || column == 6 || column == 7) {
-                    boolean isFirstRowOfPhase = (row % 11 == 1) || (row % 11 == 6);
-                    return isFirstRowOfPhase;
-                }
-                
+                // Khóa các cột 0, 1, 2
+                if (column == 0 || column == 1 || column == 2) return false;
                 return true;
             }
         };
@@ -396,22 +419,19 @@ public class Tab9_TransportPanel extends JPanel {
 
                 boolean isGroupHeader = (r % 11 == 0);
                 boolean isFirstOfPhase = (r % 11 == 1) || (r % 11 == 6);
-                boolean isMergedColumn = (c == 0 || c == 1 || c == 2 || c == 5 || c == 6 || c == 7);
                 
                 int topBorder = 1;
                 if (!isGroupHeader) {
-                    if (isMergedColumn) {
-                        if (c == 0) {
-                            topBorder = 0; // Cột 0 (Hướng) merge xuyên suốt 10 dòng con
-                        } else if (!isFirstOfPhase) {
-                            topBorder = 0; // Các cột merge khác merge theo 5 dòng của GĐ
+                    if (c == 0 || c == 1) { // Merge ô cho Nội dung, Đơn vị
+                        if (!isFirstOfPhase) {
+                            topBorder = 0; 
                         }
                     }
                 }
 
-                ((JComponent) comp).setBorder(BorderFactory.createMatteBorder(topBorder, 0, 1, c == 13 ? 0 : 1, gridColor));
+                ((JComponent) comp).setBorder(BorderFactory.createMatteBorder(topBorder, 0, 1, c == 11 ? 0 : 1, gridColor));
 
-                if (c <= 1 || c == 5 || c == 6) setHorizontalAlignment(SwingConstants.LEFT);
+                if (c <= 2) setHorizontalAlignment(SwingConstants.LEFT);
                 else setHorizontalAlignment(SwingConstants.CENTER);
 
                 // Tô nền xám nhạt và in đậm cho 2 cột đầu tiên và Group Header để nhấn mạnh cấu trúc
@@ -419,14 +439,14 @@ public class Tab9_TransportPanel extends JPanel {
                     setFont(new Font("Times New Roman", Font.BOLD, 15));
                     comp.setBackground(new Color(226, 232, 240)); // Màu đậm hơn cho Header Nhóm
                     comp.setForeground(SLATE_TEXT);
-                } else if (c <= 1 || c == 3) {
+                } else if (c <= 2) {
                     setFont(new Font("Times New Roman", Font.BOLD, 15));
                     comp.setBackground(new Color(248, 250, 252));
                     comp.setForeground(SLATE_TEXT);
                 } else {
                     setFont(new Font("Times New Roman", Font.PLAIN, 15));
                     comp.setForeground(Color.BLACK);
-                    if (isSel && c > 3) comp.setBackground(new Color(219, 234, 254));
+                    if (isSel && c > 2) comp.setBackground(new Color(219, 234, 254));
                     else comp.setBackground(Color.WHITE);
                 }
                 return comp;
@@ -475,32 +495,31 @@ public class Tab9_TransportPanel extends JPanel {
     private JPanel createKeHoachHeader(int[] w) {
         JPanel p = new JPanel(null); p.setBackground(ROW_GRAY);
         int totalWidth = 0; for (int width : w) totalWidth += width; p.setPreferredSize(new Dimension(totalWidth, 90));
-        int[] x = new int[15]; x[0]=0; for(int i=0; i<14; i++) x[i+1] = x[i]+w[i];
+        int[] x = new int[13]; x[0]=0; for(int i=0; i<12; i++) x[i+1] = x[i]+w[i];
 
         // L1
-        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Nội dung, Đơn vị<br>được vận chuyển</center></html>", x[0], 0, w[0]+w[1], 90));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Người", x[2], 0, w[2], 90));
-        p.add(UIUtils.createAbsoluteHeaderLabel("TBKT, vật chất HC, KT", x[3], 0, w[3]+w[4], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Địa điểm", x[5], 0, w[5]+w[6], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Cự ly<br>(km)</center></html>", x[7], 0, w[7], 90));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Vận chuyển thô sơ", x[8], 0, w[8]+w[9]+w[10], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Vận chuyển khác", x[11], 0, w[11]+w[12]+w[13], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("TT", x[0], 0, w[0], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Nội dung, Đơn vị<br>được vận chuyển</center></html>", x[1], 0, w[1], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Chủng loại<br>VKTBKT, vật chất</center></html>", x[2], 0, w[2], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Khối lượng<br>vận chuyển</center></html>", x[3], 0, w[3], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Địa điểm", x[4], 0, w[4]+w[5], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Cự ly<br>(km)</center></html>", x[6], 0, w[6], 90));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Vận chuyển bằng cơ giới", x[7], 0, w[7]+w[8], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Vận chuyển thô sơ", x[9], 0, w[9]+w[10]+w[11], 30));
 
         // L2
-        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Chủng<br>loại</center></html>", x[3], 30, w[3], 60));
-        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Khối<br>lượng (tấn)</center></html>", x[4], 30, w[4], 60));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Nơi nhận", x[5], 30, w[5], 60));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Nơi giao", x[6], 30, w[6], 60));
-        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>vật chất<br>(tấn)</center></html>", x[8], 30, w[8], 60));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Thời gian", x[9], 30, w[9]+w[10], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>vật chất<br>(tấn)</center></html>", x[11], 30, w[11], 60));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Thời gian", x[12], 30, w[12]+w[13], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Vật chất<br>(tấn)</center></html>", x[3], 30, w[3], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Nơi nhận", x[4], 30, w[4], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Nơi giao", x[5], 30, w[5], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Khối lượng<br>vận chuyển</center></html>", x[7], 30, w[7]+w[8], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>Vật chất<br>(tấn)</center></html>", x[9], 30, w[9], 60));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Thời gian", x[10], 30, w[10]+w[11], 30));
 
         // L3
-        p.add(UIUtils.createAbsoluteHeaderLabel("Bắt đầu", x[9], 60, w[9], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Kết thúc", x[10], 60, w[10], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Bắt đầu", x[12], 60, w[12], 30));
-        p.add(UIUtils.createAbsoluteHeaderLabel("Kết thúc", x[13], 60, w[13], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Người", x[7], 60, w[7], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("<html><center>V/chất<br>(tấn)</center></html>", x[8], 60, w[8], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Bắt đầu", x[10], 60, w[10], 30));
+        p.add(UIUtils.createAbsoluteHeaderLabel("Kết thúc", x[11], 60, w[11], 30));
 
         return p;
     }
@@ -509,7 +528,10 @@ public class Tab9_TransportPanel extends JPanel {
         return service.getExportData(
                 txtDuongVanTai.getText().trim(),
                 modelKhoiLuong,
-                modelKeHoach
+                modelKeHoach,
+                txtBpChuanBi.getText().trim(),
+                txtBpChienDau.getText().trim(),
+                txtBpSauChienDau.getText().trim()
         );
     }
 
@@ -544,13 +566,13 @@ public class Tab9_TransportPanel extends JPanel {
 
             for (String g : groups) {
                 // Dòng Group Header
-                modelKeHoach.addRow(new Object[]{g, "", "", "", "", "", "", "", "", "", "", "", "", ""});
+                modelKeHoach.addRow(new Object[]{g, "", "", "", "", "", "", "", "", "", "", ""});
                 for (int p = 0; p < 2; p++) {
                     String phase = (p == 0) ? "GĐCB" : "GĐCĐ";
                     for (int i = 0; i < items.length; i++) {
                         String col1 = (i == 0) ? phase : "";
-                        String col3 = items[i];
-                        modelKeHoach.addRow(new Object[]{"", col1, "", col3, "", "", "", "", "", "", "", "", "", ""});
+                        String col2 = items[i];
+                        modelKeHoach.addRow(new Object[]{"", col1, col2, "", "", "", "", "", "", "", "", ""});
                     }
                 }
             }
@@ -604,43 +626,44 @@ public class Tab9_TransportPanel extends JPanel {
         isCalculating = true;
 
         try {
-            // 1. Tính tổng dọc cho Vật chất khác (9) và Người (11)
-            int[] sumCols = {9, 11};
+            // 1. Tính tổng dọc: GĐCB = tổng các dòng con (có cả Kho), GĐCĐ = tổng các dòng con, Toàn trận = GĐCB + GĐCĐ
+            int[] sumCols = {2, 3, 5, 6, 7, 9, 11};
             for (int c : sumCols) {
                 String r3 = str(modelKhoiLuong.getValueAt(3, c));
                 String r4 = str(modelKhoiLuong.getValueAt(4, c));
                 String r5 = str(modelKhoiLuong.getValueAt(5, c));
-                if (!r3.isEmpty() || !r4.isEmpty() || !r5.isEmpty()) {
-                    double gdcb = parse(r3) + parse(r4) + parse(r5);
+                String r6 = str(modelKhoiLuong.getValueAt(6, c));
+                if (!r3.isEmpty() || !r4.isEmpty() || !r5.isEmpty() || !r6.isEmpty()) {
+                    double gdcb = parse(r3) + parse(r4) + parse(r5) + parse(r6);
                     modelKhoiLuong.setValueAt(c == 11 ? fmtNguoi(gdcb) : fmtTon(gdcb), 2, c);
                 } else {
                     modelKhoiLuong.setValueAt("", 2, c);
                 }
 
-                String r7 = str(modelKhoiLuong.getValueAt(7, c));
                 String r8 = str(modelKhoiLuong.getValueAt(8, c));
                 String r9 = str(modelKhoiLuong.getValueAt(9, c));
-                if (!r7.isEmpty() || !r8.isEmpty() || !r9.isEmpty()) {
-                    double gdcd = parse(r7) + parse(r8) + parse(r9);
-                    modelKhoiLuong.setValueAt(c == 11 ? fmtNguoi(gdcd) : fmtTon(gdcd), 6, c);
+                String r10 = str(modelKhoiLuong.getValueAt(10, c));
+                if (!r8.isEmpty() || !r9.isEmpty() || !r10.isEmpty()) {
+                    double gdcd = parse(r8) + parse(r9) + parse(r10);
+                    modelKhoiLuong.setValueAt(c == 11 ? fmtNguoi(gdcd) : fmtTon(gdcd), 7, c);
                 } else {
-                    modelKhoiLuong.setValueAt("", 6, c);
+                    modelKhoiLuong.setValueAt("", 7, c);
                 }
 
                 String r2 = str(modelKhoiLuong.getValueAt(2, c));
-                String r6 = str(modelKhoiLuong.getValueAt(6, c));
-                if (!r2.isEmpty() || !r6.isEmpty()) {
-                    double toan = parse(r2) + parse(r6);
+                String r7 = str(modelKhoiLuong.getValueAt(7, c));
+                if (!r2.isEmpty() || !r7.isEmpty()) {
+                    double toan = parse(r2) + parse(r7);
                     modelKhoiLuong.setValueAt(c == 11 ? fmtNguoi(toan) : fmtTon(toan), 1, c);
                 } else {
                     modelKhoiLuong.setValueAt("", 1, c);
                 }
             }
 
-            // 2. Tính tổng ngang cho tất cả các dòng (1 -> 9)
-            for (int r = 1; r <= 9; r++) {
-                String c2 = str(modelKhoiLuong.getValueAt(r, 2));
-                String c3 = str(modelKhoiLuong.getValueAt(r, 3));
+            // 2. Tính tổng ngang cho tất cả các dòng (1 -> 10)
+            for (int r = 1; r <= 10; r++) {
+                String c2 = str(modelKhoiLuong.getValueAt(r, 2)); // Đạn
+                String c3 = str(modelKhoiLuong.getValueAt(r, 3)); // VTKT
                 if (!c2.isEmpty() || !c3.isEmpty()) {
                     double plusVK = parse(c2) + parse(c3);
                     modelKhoiLuong.setValueAt(fmtTon(plusVK), r, 4);
@@ -648,9 +671,9 @@ public class Tab9_TransportPanel extends JPanel {
                     modelKhoiLuong.setValueAt("", r, 4);
                 }
 
-                String c5 = str(modelKhoiLuong.getValueAt(r, 5));
-                String c6 = str(modelKhoiLuong.getValueAt(r, 6));
-                String c7 = str(modelKhoiLuong.getValueAt(r, 7));
+                String c5 = str(modelKhoiLuong.getValueAt(r, 5)); // QN
+                String c6 = str(modelKhoiLuong.getValueAt(r, 6)); // QY
+                String c7 = str(modelKhoiLuong.getValueAt(r, 7)); // DT
                 if (!c5.isEmpty() || !c6.isEmpty() || !c7.isEmpty()) {
                     double plusVCHC = parse(c5) + parse(c6) + parse(c7);
                     modelKhoiLuong.setValueAt(fmtTon(plusVCHC), r, 8);
@@ -658,9 +681,9 @@ public class Tab9_TransportPanel extends JPanel {
                     modelKhoiLuong.setValueAt("", r, 8);
                 }
 
-                String c4 = str(modelKhoiLuong.getValueAt(r, 4));
-                String c8 = str(modelKhoiLuong.getValueAt(r, 8));
-                String c9 = str(modelKhoiLuong.getValueAt(r, 9));
+                String c4 = str(modelKhoiLuong.getValueAt(r, 4)); // + Đạn+VTKT
+                String c8 = str(modelKhoiLuong.getValueAt(r, 8)); // + VCHC
+                String c9 = str(modelKhoiLuong.getValueAt(r, 9)); // Khác
                 if (!c4.isEmpty() || !c8.isEmpty() || !c9.isEmpty()) {
                     double cong = parse(c4) + parse(c8) + parse(c9);
                     modelKhoiLuong.setValueAt(fmtTon(cong), r, 10);
@@ -675,48 +698,58 @@ public class Tab9_TransportPanel extends JPanel {
 
     private void updateDanWeightsFromAssignments(boolean isGdcb) {
         if (modelKhoiLuong == null) return;
-        
-        java.util.Map<String, java.util.Map<String, Double>> data = org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getMiniTableToanDReadOnly();
+
         java.util.Map<String, Integer> assignments = isGdcb ? danGdcbAssignments : danGdcdAssignments;
-        
+
         double weightRow1 = 0; // row 3 hoặc 7 (Trên chuyển)
         double weightRow2 = 0; // row 4 hoặc 8 (Cấp mình)
         double weightRow3 = 0; // row 5 hoặc 9 (Dưới chuyển)
-        
-        for (java.util.Map.Entry<String, java.util.Map<String, Double>> entry : data.entrySet()) {
-            String label = entry.getKey().trim();
-            Integer assignedRow = assignments.get(label);
-            
-            if (assignedRow != null) {
-                java.util.Map<String, Double> values = entry.getValue();
-                double dv = values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_DV, 0.0);
-                double kho = values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_KHO, 0.0);
-                double gdcb = dv + kho;
-                double gdcd = values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_THUC_HANH, 0.0);
-                
-                double weight = isGdcb ? gdcb : gdcd;
-                
-                if (isGdcb) {
-                    if (assignedRow == 3) weightRow1 += weight;
-                    else if (assignedRow == 4) weightRow2 += weight;
-                    else if (assignedRow == 5) weightRow3 += weight;
-                } else {
-                    if (assignedRow == 7) weightRow1 += weight;
-                    else if (assignedRow == 8) weightRow2 += weight;
-                    else if (assignedRow == 9) weightRow3 += weight;
-                }
+
+        // Duyệt qua tất cả keys dạng "huong::label"
+        java.util.Map<String, java.util.Map<String, java.util.Map<String, Double>>> allDirDan =
+                org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getMiniTableDanByDirectionReadOnly();
+        java.util.Map<String, java.util.Map<String, Double>> toanDDan =
+                org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getMiniTableToanDReadOnly();
+
+        for (java.util.Map.Entry<String, Integer> entry : assignments.entrySet()) {
+            String key = entry.getKey(); // "huong::label"
+            Integer assignedRow = entry.getValue();
+            if (assignedRow == null) continue;
+            int sep = key.indexOf("::");
+            if (sep < 0) continue;
+            String huong = key.substring(0, sep);
+            String label = key.substring(sep + 2);
+
+            // Lấy giá trị từ data theo hướng, fallback toàn đội
+            java.util.Map<String, java.util.Map<String, Double>> dirData = allDirDan.get(huong);
+            java.util.Map<String, Double> values = (dirData != null) ? dirData.get(label) : null;
+            if (values == null) values = toanDDan.get(label);
+            if (values == null) continue;
+
+            double dv  = values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_DV,  0.0);
+            double kho = values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_KHO, 0.0);
+            double weight = isGdcb ? (dv + kho) :
+                            values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_THUC_HANH, 0.0);
+
+            if (isGdcb) {
+                if (assignedRow == 3) weightRow1 += weight;
+                else if (assignedRow == 4) weightRow2 += weight;
+                else if (assignedRow == 5) weightRow3 += weight;
+            } else {
+                if (assignedRow == 8) weightRow1 += weight;
+                else if (assignedRow == 9) weightRow2 += weight;
+                else if (assignedRow == 10) weightRow3 += weight;
             }
         }
-        
-        // Update table cells (Cột Đạn = 2) without triggering infinite recalculations (recalculateKhoiLuong will be triggered naturally by the listener)
-        int r1 = isGdcb ? 3 : 7;
-        int r2 = isGdcb ? 4 : 8;
-        int r3 = isGdcb ? 5 : 9;
-        
+
+        int r1 = isGdcb ? 3 : 8;
+        int r2 = isGdcb ? 4 : 9;
+        int r3 = isGdcb ? 5 : 10;
+
         modelKhoiLuong.setValueAt(weightRow1 > 0 ? fmtTon(weightRow1) : "", r1, 2);
         modelKhoiLuong.setValueAt(weightRow2 > 0 ? fmtTon(weightRow2) : "", r2, 2);
         modelKhoiLuong.setValueAt(weightRow3 > 0 ? fmtTon(weightRow3) : "", r3, 2);
-        
+
         updateKeHoachDetails();
     }
 
@@ -750,48 +783,57 @@ public class Tab9_TransportPanel extends JPanel {
 
     private void updateVchcWeightsFromAssignments(int categoryIndex, int col, boolean isGdcb) {
         if (modelKhoiLuong == null) return;
-        
-        java.util.Map<String, java.util.Map<String, Double>> data = org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getMiniTableVCHCReadOnly();
+
         java.util.Map<String, Integer> assignments = getVchcAssignmentMap(categoryIndex, isGdcb);
-        
-        double weightRow1 = 0; // row 3 hoặc 7 (Trên chuyển)
-        double weightRow2 = 0; // row 4 hoặc 8 (Cấp mình)
-        double weightRow3 = 0; // row 5 hoặc 9 (Dưới chuyển)
-        
-        for (java.util.Map.Entry<String, java.util.Map<String, Double>> entry : data.entrySet()) {
-            String label = entry.getKey().trim();
-            Integer assignedRow = assignments.get(label);
-            
-            if (assignedRow != null) {
-                java.util.Map<String, Double> values = entry.getValue();
-                
-                double gdcbKho = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_KHO, 0.0);
-                double gdcbDv = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_DV_D, 0.0);
-                double gdcdKho = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_KHO, 0.0);
-                double gdcdDv = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_DV, 0.0);
-                
-                double weight = isGdcb ? (gdcbKho + gdcbDv) : (gdcdKho + gdcdDv);
-                
-                if (isGdcb) {
-                    if (assignedRow == 3) weightRow1 += weight;
-                    else if (assignedRow == 4) weightRow2 += weight;
-                    else if (assignedRow == 5) weightRow3 += weight;
-                } else {
-                    if (assignedRow == 7) weightRow1 += weight;
-                    else if (assignedRow == 8) weightRow2 += weight;
-                    else if (assignedRow == 9) weightRow3 += weight;
-                }
+
+        double weightRow1 = 0;
+        double weightRow2 = 0;
+        double weightRow3 = 0;
+
+        java.util.Map<String, java.util.Map<String, java.util.Map<String, Double>>> allDirVchc =
+                org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getMiniTableVCHCByDirectionReadOnly();
+        java.util.Map<String, java.util.Map<String, Double>> toanDVchc =
+                org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getMiniTableVCHCReadOnly();
+
+        for (java.util.Map.Entry<String, Integer> entry : assignments.entrySet()) {
+            String key = entry.getKey(); // "huong::label"
+            Integer assignedRow = entry.getValue();
+            if (assignedRow == null) continue;
+            int sep = key.indexOf("::");
+            if (sep < 0) continue;
+            String huong = key.substring(0, sep);
+            String label = key.substring(sep + 2);
+
+            java.util.Map<String, java.util.Map<String, Double>> dirData = allDirVchc.get(huong);
+            java.util.Map<String, Double> values = (dirData != null) ? dirData.get(label) : null;
+            if (values == null) values = toanDVchc.get(label);
+            if (values == null) continue;
+
+            double gdcbKho = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_KHO, 0.0);
+            double gdcbDv  = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_DV_D, 0.0);
+            double gdcdKho = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_KHO, 0.0);
+            double gdcdDv  = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_DV, 0.0);
+            double weight = isGdcb ? (gdcbKho + gdcbDv) : (gdcdKho + gdcdDv);
+
+            if (isGdcb) {
+                if (assignedRow == 3) weightRow1 += weight;
+                else if (assignedRow == 4) weightRow2 += weight;
+                else if (assignedRow == 5) weightRow3 += weight;
+            } else {
+                if (assignedRow == 8) weightRow1 += weight;
+                else if (assignedRow == 9) weightRow2 += weight;
+                else if (assignedRow == 10) weightRow3 += weight;
             }
         }
-        
-        int r1 = isGdcb ? 3 : 7;
-        int r2 = isGdcb ? 4 : 8;
-        int r3 = isGdcb ? 5 : 9;
-        
+
+        int r1 = isGdcb ? 3 : 8;
+        int r2 = isGdcb ? 4 : 9;
+        int r3 = isGdcb ? 5 : 10;
+
         modelKhoiLuong.setValueAt(weightRow1 > 0 ? fmtTon(weightRow1) : "", r1, col);
         modelKhoiLuong.setValueAt(weightRow2 > 0 ? fmtTon(weightRow2) : "", r2, col);
         modelKhoiLuong.setValueAt(weightRow3 > 0 ? fmtTon(weightRow3) : "", r3, col);
-        
+
         updateKeHoachDetails();
     }
 
@@ -903,42 +945,78 @@ public class Tab9_TransportPanel extends JPanel {
         try {
             int rowCount = modelKeHoach.getRowCount();
             String currentGroup = "";
-            
-            java.util.Map<String, java.util.Map<String, Double>> toanDVchc = org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getMiniTableVCHCReadOnly();
-            java.util.Map<String, java.util.Map<String, Double>> toanDDan = org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getMiniTableToanDReadOnly();
-            
-            java.util.Map<String, java.util.Map<String, java.util.Map<String, Double>>> dirVchc = org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getMiniTableVCHCByDirectionReadOnly();
-            java.util.Map<String, java.util.Map<String, java.util.Map<String, Double>>> dirDan = org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getMiniTableDanByDirectionReadOnly();
-            
+            String currentPhase = "GĐCB"; // default
+
+            java.util.Map<String, java.util.Map<String, Double>> toanDVchc =
+                    org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getMiniTableVCHCReadOnly();
+            java.util.Map<String, java.util.Map<String, Double>> toanDDan =
+                    org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getMiniTableToanDReadOnly();
+            java.util.Map<String, java.util.Map<String, java.util.Map<String, Double>>> dirVchc =
+                    org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.getMiniTableVCHCByDirectionReadOnly();
+            java.util.Map<String, java.util.Map<String, java.util.Map<String, Double>>> dirDan =
+                    org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.getMiniTableDanByDirectionReadOnly();
+
             for (int r = 0; r < rowCount; r++) {
-                boolean isGroupHeader = (r % 11 == 0);
+                boolean isGroupHeader = !String.valueOf(modelKeHoach.getValueAt(r, 0)).trim().isEmpty();
                 if (isGroupHeader) {
                     currentGroup = String.valueOf(modelKeHoach.getValueAt(r, 0)).trim();
+                    currentPhase = "GĐCB";
                     continue;
                 }
-                
-                boolean isGdcb = (r % 11 >= 1 && r % 11 <= 5);
-                String itemType = String.valueOf(modelKeHoach.getValueAt(r, 3)).trim(); // QN, QY, DT, VTKT, Đạn
-                
+
+                // Track current phase by looking for "GĐCB"/"GĐCĐ" in col 1
+                String phaseCol = String.valueOf(modelKeHoach.getValueAt(r, 1)).trim();
+                if ("GĐCB".equals(phaseCol)) currentPhase = "GĐCB";
+                else if ("GĐCĐ".equals(phaseCol)) currentPhase = "GĐCĐ";
+                boolean isGdcb = !"GĐCĐ".equals(currentPhase);
+                // Cột 2 = item type
+                String itemType = String.valueOf(modelKeHoach.getValueAt(r, 2)).trim();
+
                 double weight = 0.0;
                 boolean isToanD = "TỔNG SỐ".equals(currentGroup);
-                
+                // huong để tra cứu trong assignment keys
+                String huongKey = currentGroup; // ví dụ "Hướng A"
+
                 if ("Đạn".equals(itemType)) {
                     java.util.Map<String, Integer> assignments = isGdcb ? danGdcbAssignments : danGdcdAssignments;
-                    java.util.Map<String, java.util.Map<String, Double>> dataMap = isToanD ? toanDDan : dirDan.get(currentGroup);
-                    if (dataMap != null && assignments != null) {
-                        int targetAssignedRow = isGdcb ? 4 : 8; // 4 = Cấp mình GĐCB, 8 = Cấp mình GĐCĐ
-                        for (java.util.Map.Entry<String, java.util.Map<String, Double>> entry : dataMap.entrySet()) {
-                            String label = entry.getKey().trim();
-                            Integer assignedRow = assignments.get(label);
-                            if (assignedRow != null && assignedRow == targetAssignedRow) {
-                                java.util.Map<String, Double> values = entry.getValue();
-                                if (isGdcb) {
-                                    weight += values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_DV, 0.0);
-                                    weight += values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_KHO, 0.0);
-                                } else {
-                                    weight += values.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_THUC_HANH, 0.0);
-                                }
+                    int targetAssignedRow = isGdcb ? 4 : 9;
+
+                    if (isToanD) {
+                        // TỔNG SỐ: cộng tất cả assignments có assignedRow đúng
+                        for (java.util.Map.Entry<String, Integer> ae : assignments.entrySet()) {
+                            if (!ae.getValue().equals(targetAssignedRow)) continue;
+                            String key = ae.getKey();
+                            int sep = key.indexOf("::");
+                            if (sep < 0) continue;
+                            String hdir = key.substring(0, sep);
+                            String label = key.substring(sep + 2);
+                            java.util.Map<String, java.util.Map<String, Double>> dd = dirDan.get(hdir);
+                            java.util.Map<String, Double> vals = (dd != null) ? dd.get(label) : null;
+                            if (vals == null) vals = toanDDan.get(label);
+                            if (vals == null) continue;
+                            if (isGdcb) {
+                                weight += vals.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_DV,  0.0);
+                                weight += vals.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_KHO, 0.0);
+                            } else {
+                                weight += vals.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_THUC_HANH, 0.0);
+                            }
+                        }
+                    } else {
+                        // Hướng cụ thể: chỉ cộng assignments có prefix "huong::"
+                        String prefix = huongKey + "::";
+                        java.util.Map<String, java.util.Map<String, Double>> dd = dirDan.get(huongKey);
+                        for (java.util.Map.Entry<String, Integer> ae : assignments.entrySet()) {
+                            if (!ae.getValue().equals(targetAssignedRow)) continue;
+                            if (!ae.getKey().startsWith(prefix)) continue;
+                            String label = ae.getKey().substring(prefix.length());
+                            java.util.Map<String, Double> vals = (dd != null) ? dd.get(label) : null;
+                            if (vals == null) vals = toanDDan.get(label);
+                            if (vals == null) continue;
+                            if (isGdcb) {
+                                weight += vals.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_DV,  0.0);
+                                weight += vals.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_TRUOC_NO_KHO, 0.0);
+                            } else {
+                                weight += vals.getOrDefault(org.example.Popup.Tab5_DanPanel.Tab5_DanPanelService.TL_THUC_HANH, 0.0);
                             }
                         }
                     }
@@ -948,31 +1026,53 @@ public class Tab9_TransportPanel extends JPanel {
                     else if ("QY".equals(itemType)) catIdx = 1;
                     else if ("DT".equals(itemType)) catIdx = 2;
                     else if ("VTKT".equals(itemType)) catIdx = 3;
-                    
+
                     if (catIdx != -1) {
                         java.util.Map<String, Integer> assignments = getVchcAssignmentMap(catIdx, isGdcb);
-                        java.util.Map<String, java.util.Map<String, Double>> dataMap = isToanD ? toanDVchc : dirVchc.get(currentGroup);
-                        
-                        if (dataMap != null && assignments != null) {
-                            int targetAssignedRow = isGdcb ? 4 : 8; // 4 = Cấp mình GĐCB, 8 = Cấp mình GĐCĐ
-                            for (java.util.Map.Entry<String, java.util.Map<String, Double>> entry : dataMap.entrySet()) {
-                                String label = entry.getKey().trim();
-                                Integer assignedRow = assignments.get(label);
-                                if (assignedRow != null && assignedRow == targetAssignedRow) {
-                                    java.util.Map<String, Double> values = entry.getValue();
-                                    if (isGdcb) {
-                                        weight += values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_KHO, 0.0);
-                                        weight += values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_DV_D, 0.0);
-                                    } else {
-                                        weight += values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_KHO, 0.0);
-                                        weight += values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_DV, 0.0);
-                                    }
+                        int targetAssignedRow = isGdcb ? 4 : 9;
+
+                        if (isToanD) {
+                            for (java.util.Map.Entry<String, Integer> ae : assignments.entrySet()) {
+                                if (!ae.getValue().equals(targetAssignedRow)) continue;
+                                String key = ae.getKey();
+                                int sep = key.indexOf("::");
+                                if (sep < 0) continue;
+                                String hdir = key.substring(0, sep);
+                                String label = key.substring(sep + 2);
+                                java.util.Map<String, java.util.Map<String, Double>> dv = dirVchc.get(hdir);
+                                java.util.Map<String, Double> vals = (dv != null) ? dv.get(label) : null;
+                                if (vals == null) vals = toanDVchc.get(label);
+                                if (vals == null) continue;
+                                if (isGdcb) {
+                                    weight += vals.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_KHO,  0.0);
+                                    weight += vals.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_DV_D, 0.0);
+                                } else {
+                                    weight += vals.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_KHO, 0.0);
+                                    weight += vals.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_DV,  0.0);
+                                }
+                            }
+                        } else {
+                            String prefix = huongKey + "::";
+                            java.util.Map<String, java.util.Map<String, Double>> dv = dirVchc.get(huongKey);
+                            for (java.util.Map.Entry<String, Integer> ae : assignments.entrySet()) {
+                                if (!ae.getValue().equals(targetAssignedRow)) continue;
+                                if (!ae.getKey().startsWith(prefix)) continue;
+                                String label = ae.getKey().substring(prefix.length());
+                                java.util.Map<String, Double> vals = (dv != null) ? dv.get(label) : null;
+                                if (vals == null) vals = toanDVchc.get(label);
+                                if (vals == null) continue;
+                                if (isGdcb) {
+                                    weight += vals.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_KHO,  0.0);
+                                    weight += vals.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_DV_D, 0.0);
+                                } else {
+                                    weight += vals.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_KHO, 0.0);
+                                    weight += vals.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_DV,  0.0);
                                 }
                             }
                         }
                     }
                 }
-                
+
                 modelKeHoach.setValueAt(weight > 0 ? fmtTon(weight) : "", r, 4);
             }
         } finally {

@@ -26,7 +26,7 @@ public class Tab3_OrganizationPanelUI extends JPanel {
         setBackground(Color.WHITE);
         setBorder(new EmptyBorder(20, 30, 20, 30));
 
-        JLabel lblTitle = new JLabel("III. TỔ CHỨC, BỐ TRÍ LỰC LƯỢNG HẬU CẦN, KỸ THUẬT");
+        JLabel lblTitle = new JLabel("III. TỔ CHỨC, SỬ DỤNG LỰC LƯỢNG, BỐ TRÍ HẬU CẦN, KỸ THUẬT");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
         lblTitle.setForeground(new Color(30, 41, 59));
         add(lblTitle, BorderLayout.NORTH);

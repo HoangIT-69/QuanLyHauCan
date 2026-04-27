@@ -118,6 +118,18 @@ public class H2SchemaInitializer {
                     stmt.executeUpdate("ALTER TABLE step1_thong_tin ADD COLUMN " + col);
                 } catch (SQLException ignored) {}
             }
+            // Dọn duplicate rows, chỉ giữ lại row mới nhất theo id
+            try {
+                stmt.executeUpdate(
+                    "DELETE FROM step1_thong_tin WHERE id NOT IN (" +
+                    "  SELECT max_id FROM (SELECT MAX(id) AS max_id FROM step1_thong_tin GROUP BY session_id) AS t" +
+                    ")"
+                );
+            } catch (SQLException ignored) {}
+            // Đảm bảo session_id là UNIQUE
+            try {
+                stmt.executeUpdate("ALTER TABLE step1_thong_tin ADD CONSTRAINT uq_step1_session UNIQUE (session_id)");
+            } catch (SQLException ignored) {}
 
             // 7. Bảng step3_vat_chat (phân cấp theo tên cột nghiệp vụ; giữ cột legacy để migrate)
             stmt.executeUpdate(
@@ -354,20 +366,20 @@ public class H2SchemaInitializer {
 
         // quyuoc_vchc (đủ danh mục + item đặc biệt để test nghiệp vụ)
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'Quân lương', 'Gạo tẻ', 1.5, 'Kg/ngày', 'Kg' " +
+                "SELECT 'Quân lương', 'Gạo tẻ', 1.5, 'Kg/ngày', 'Ngày' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Gạo tẻ')");
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'Quân lương', 'Thịt hộp', 0.25, 'Kg/ngày', 'Kg' " +
+                "SELECT 'Quân lương', 'Thịt hộp', 0.25, 'Kg/ngày', 'Ngày' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Thịt hộp')");
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'Quân lương', 'Đường sữa thương binh', 0.02, 'Kg/người/ngày', 'Kg' " +
+                "SELECT 'Quân lương', 'Đường sữa thương binh', 0.02, 'Kg/người/ngày', '%QS' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Đường sữa thương binh')");
 
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
                 "SELECT 'Quân trang', 'Áo mưa', 1, 'Cái/người', 'Cái' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Áo mưa')");
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'Quân trang', 'Giày vải', 1, 'Đôi/người', 'Đôi' " +
+                "SELECT 'Quân trang', 'Giày vải', 1, 'Cái/người', 'Cái' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Giày vải')");
 
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
@@ -384,20 +396,20 @@ public class H2SchemaInitializer {
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Thuốc sát trùng')");
 
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'Doanh trại', 'Dầu thắp', 0.2, 'Lít/ngày', 'Lít' " +
+                "SELECT 'Doanh trại', 'Dầu thắp', 0.2, 'Lít/ngày', 'Ngày' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Dầu thắp')");
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'Doanh trại', 'Bạt dã chiến', 0.015, 'Tấm/người', 'Tấm' " +
+                "SELECT 'Doanh trại', 'Bạt dã chiến', 0.015, 'Cái/người', 'Cái' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Bạt dã chiến')");
 
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'VTKT', 'Mỡ bảo quản súng', 0.05, 'Kg/khẩu', 'Kg' " +
+                "SELECT 'VTKT', 'Mỡ bảo quản súng', 0.05, 'Kg/khẩu', 'Cái' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Mỡ bảo quản súng')");
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'VTKT', 'Dầu súng AK', 0.03, 'Lít/khẩu', 'Lít' " +
+                "SELECT 'VTKT', 'Dầu súng AK', 0.03, 'Lít/khẩu', 'Cái' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Dầu súng AK')");
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +
-                "SELECT 'VTKT', 'Giẻ lau súng', 0.2, 'Kg/100 khẩu', 'Kg' " +
+                "SELECT 'VTKT', 'Giẻ lau súng', 0.2, 'Kg/100 khẩu', 'Cái' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM quyuoc_vchc WHERE ten_vat_chat = 'Giẻ lau súng')");
 
         stmt.executeUpdate("INSERT INTO quyuoc_vchc (danh_muc, ten_vat_chat, quy_uoc, don_vi_quy_uoc, don_vi_tinh) " +

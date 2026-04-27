@@ -30,7 +30,7 @@ public class Step3_MaterialPanelUI extends JPanel {
     private final int phanCount;
     private final String[] phanLabels;
     private final int totalCols;
-    /** Cột ghi chú = 6 + phanCount */
+    /** Cột ghi chú = 7 + phanCount (có thêm cột Phối thuộc). */
     private final int colNote;
     private final int[] colWidths;
 
@@ -47,8 +47,8 @@ public class Step3_MaterialPanelUI extends JPanel {
         this.hinhThucTapBai = hinhThucTapBai != null ? hinhThucTapBai : "";
         this.phanLabels = RegulationDetailDialogService.phanCapLabels(this.hinhThucTapBai);
         this.phanCount = phanLabels.length;
-        this.totalCols = 7 + phanCount;
-        this.colNote = 6 + phanCount;
+        this.totalCols = 8 + phanCount;
+        this.colNote = 7 + phanCount;
         this.colWidths = buildColWidths(phanCount);
 
         setLayout(new BorderLayout(0, 10));
@@ -217,23 +217,27 @@ public class Step3_MaterialPanelUI extends JPanel {
         });
 
         btnBack.addActionListener(e -> parent.navigateStep(2));
-        btnNext.addActionListener(e -> parent.navigateStep(4));
+        btnNext.addActionListener(e -> {
+            parent.saveStep3ToDatabase();
+            parent.navigateStep(4);
+        });
 
         loadDataFromDatabase();
     }
 
     private static int[] buildColWidths(int phanCount) {
-        int[] w = new int[7 + phanCount];
+        int[] w = new int[8 + phanCount];
         w[0] = 50;
         w[1] = 310;
         w[2] = 70;
         w[3] = 70;
         w[4] = 70;
         w[5] = 70;
+        w[6] = 100; // Phối thuộc
         for (int i = 0; i < phanCount; i++) {
-            w[6 + i] = 118;
+            w[7 + i] = 118;
         }
-        w[6 + phanCount] = 160;
+        w[7 + phanCount] = 160;
         return w;
     }
 
@@ -245,8 +249,9 @@ public class Step3_MaterialPanelUI extends JPanel {
         names[3] = "Tổng";
         names[4] = "Kho/d";
         names[5] = "Đơn vị";
+        names[6] = "Phối thuộc";
         for (int i = 0; i < phanCount; i++) {
-            names[6 + i] = phanLabels[i];
+            names[7 + i] = phanLabels[i];
         }
         names[colNote] = "Ghi chú";
         return names;
@@ -296,10 +301,11 @@ public class Step3_MaterialPanelUI extends JPanel {
         r[1] = entry.name;
         r[2] = entry.dvt != null ? entry.dvt : "";
         r[3] = "0";
-        r[4] = "0";
-        r[5] = "0";
+        r[4] = "";
+        r[5] = "";
+        r[6] = "";
         for (int i = 0; i < phanCount; i++) {
-            r[6 + i] = "0";
+            r[7 + i] = "";
         }
         r[colNote] = "";
         return r;
@@ -435,7 +441,7 @@ public class Step3_MaterialPanelUI extends JPanel {
 
             double[] six = new double[Step3_MaterialPanelService.PHAN_SLOT_COUNT];
             for (int j = 0; j < phanCount; j++) {
-                six[j] = InputValidator.parseDoubleSafe(model.getValueAt(i, 6 + j));
+                six[j] = InputValidator.parseDoubleSafe(model.getValueAt(i, 7 + j));
             }
 
             rows.add(new Step3_MaterialPanelService.Step3SaveRow(
@@ -444,6 +450,7 @@ public class Step3_MaterialPanelUI extends JPanel {
                     model.getValueAt(i, 2) != null ? model.getValueAt(i, 2).toString() : "",
                     InputValidator.parseDoubleSafe(model.getValueAt(i, 4)),
                     InputValidator.parseDoubleSafe(model.getValueAt(i, 5)),
+                    InputValidator.parseDoubleSafe(model.getValueAt(i, 6)),
                     six,
                     model.getValueAt(i, colNote) != null ? model.getValueAt(i, colNote).toString() : ""
             ));
@@ -540,15 +547,17 @@ public class Step3_MaterialPanelUI extends JPanel {
         int tieuDoanW = colWidths[3] + colWidths[4] + colWidths[5];
         p.add(absLabel("Tiểu đoàn", x[3], 35, tieuDoanW, 35));
 
-        int phanW = x[colNote] - x[6];
-        p.add(absLabel("Phân cấp", x[6], 35, phanW, 35));
+        p.add(absLabel("Phối thuộc", x[6], 35, colWidths[6], 95));
+
+        int phanW = x[colNote] - x[7];
+        p.add(absLabel("Phân cấp", x[7], 35, phanW, 35));
 
         p.add(absLabel("Tổng", x[3], 70, colWidths[3], 60));
         p.add(absLabel("Kho/d", x[4], 70, colWidths[4], 60));
         p.add(absLabel("Đơn vị", x[5], 70, colWidths[5], 60));
 
         for (int i = 0; i < phanCount; i++) {
-            p.add(absLabel(phanHeaderHtml(phanLabels[i]), x[6 + i], 70, colWidths[6 + i], 60));
+            p.add(absLabel(phanHeaderHtml(phanLabels[i]), x[7 + i], 70, colWidths[7 + i], 60));
         }
         return p;
     }

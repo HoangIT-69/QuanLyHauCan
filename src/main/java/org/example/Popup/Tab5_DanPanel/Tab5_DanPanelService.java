@@ -274,7 +274,7 @@ public class Tab5_DanPanelService {
             while (rs.next()) {
                 String loai = rs.getString("loai_dan");
                 if (loai == null || loai.isBlank()) continue;
-                double w1 = rs.getDouble("trong_luong_1_vien");
+                double w1 = rs.getDouble("trong_luong_1_vien") / 1000.0; // kg → tấn
                 double sv = rs.getDouble("so_vien_tren_coso");
                 if (sv == 0) {
                     sv = 1;
@@ -414,7 +414,7 @@ public class Tab5_DanPanelService {
     }
 
     private static String fmtTl(double v) {
-        return String.format(Locale.US, "%.2f", v);
+        return String.format(Locale.US, "%.1f", v);
     }
 
     /** Các cột TL (2 chữ số thập phân) theo header 29 cột. */
@@ -1276,7 +1276,7 @@ public class Tab5_DanPanelService {
     private String fmt(double value) {
         if (value == 0) return "0";
         if (value == (long) value) return String.format("%d", (long) value);
-        return String.format("%.2f", value);
+        return String.format("%.1f", value);
     }
 
     /**

@@ -186,29 +186,59 @@ public class Tab5_VatChatPanelService {
         r[0] = it.tenVatChat();
         r[1] = it.dvt();
 
-        double multi = isPercentUnit(it.donViTinh()) ? 0.01 : 1.0;
         switch (type) {
             case TOAN_D -> {
-                double tlD = it.quyUoc() * p.quanSoD() * multi;
-                double tlPt = it.quyUoc() * p.quanSoPt() * multi;
+                double tlD = calcTlHauCan(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoD());
+                double tlPt = calcTlHauCan(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoPt());
                 r[2] = fmt2(tlD + tlPt);
                 r[3] = fmt2(tlD);
                 r[4] = fmt2(tlPt);
             }
             case HUONG -> {
-                // Chỉ hiện TL Toàn d = quanSoD, cột d và PT để "-"
-                r[2] = fmt2(it.quyUoc() * p.quanSoD() * multi);
+                r[2] = fmt2(calcTlHauCan(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoD()));
                 r[3] = "-";
                 r[4] = "-";
             }
             case LLC -> {
-                // Lực lượng còn lại: TL Toàn d = quanSoPt (phối thuộc), cột d và PT để "-"
-                r[2] = fmt2(it.quyUoc() * p.quanSoPt() * multi);
+                r[2] = fmt2(calcTlHauCan(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoPt()));
                 r[3] = "-";
                 r[4] = "-";
             }
         }
         return r;
+    }
+
+    /**
+     * Công thức tính TL ĐVT dùng chung cho itemRow5 và calculateTL (bảng 5 cột Hậu cần).
+     * Phân loại theo DVT, xử lý các trường hợp đặc biệt:
+     * - DVT Túi            → quyUoc (không nhân QS)
+     * - Tên Dầu thắp       → quyUoc * quanSo / 30
+     * - Tên ĐSTB           → (quyUoc/7) * quanSo * 0.01
+     * - DVT %QS/%          → quyUoc * quanSo * 0.01
+     * - DVT Bộ/Cái         → quyUoc (không nhân QS)
+     * - Mặc định           → quyUoc * quanSo
+     */
+    private double calcTlHauCan(String ten, double quyUoc, String dvt, double quanSo) {
+        if (quanSo == 0) return 0;
+        String dvtLower = dvt != null ? dvt.trim().toLowerCase(Locale.ROOT) : "";
+        String tenLower = ten != null ? ten.toLowerCase(Locale.ROOT) : "";
+
+        if (dvtLower.startsWith("túi") || dvtLower.startsWith("tui")) {
+            return quyUoc;
+        }
+        if (tenLower.contains("dầu thắp") || tenLower.contains("dau thap")) {
+            return (quyUoc * quanSo) / 30.0;
+        }
+        if (isDuongSuaOrDstbTen(ten)) {
+            return (quyUoc / 7.0) * quanSo * 0.01;
+        }
+        if (dvtLower.contains("%")) {
+            return quyUoc * quanSo * 0.01;
+        }
+        if (dvtLower.equals("bộ") || dvtLower.equals("bo") || dvtLower.equals("cái") || dvtLower.equals("cai")) {
+            return quyUoc;
+        }
+        return quyUoc * quanSo;
     }
 
     private static boolean isPercentUnit(String donViTinh) {
@@ -223,7 +253,7 @@ public class Tab5_VatChatPanelService {
     }
 
     private static String fmt2(double v) {
-        return String.format(Locale.US, "%.2f", v);
+        return String.format(Locale.US, "%.1f", v);
     }
 
     private static String romanLabel(int idx) {
@@ -397,7 +427,7 @@ public class Tab5_VatChatPanelService {
         if (Math.abs(v) < 1e-12) {
             return "0";
         }
-        DecimalFormat df = new DecimalFormat("#.##", DecimalFormatSymbols.getInstance(Locale.US));
+        DecimalFormat df = new DecimalFormat("#.#", DecimalFormatSymbols.getInstance(Locale.US));
         df.setGroupingUsed(false);
         String s = df.format(v);
         if (s.contains(".")) {
@@ -406,9 +436,9 @@ public class Tab5_VatChatPanelService {
         return s.isEmpty() ? "0" : s;
     }
 
-    /** Trọng lượng dòng tổng in đậm: luôn 2 chữ số thập phân (tấn). */
+    /** Trọng lượng dòng tổng in đậm: luôn 1 chữ số thập phân (tấn). */
     private static String fmtTonBold(double v) {
-        return String.format(Locale.US, "%.2f", v);
+        return String.format(Locale.US, "%.1f", v);
     }
 
     /** Đường sữa / ĐSTB (tên vật chất). */
@@ -898,6 +928,7 @@ public class Tab5_VatChatPanelService {
                 }
 
                 for (int col = 5; col <= 22; col++) {
+                    if (col >= vatChatModel.getColumnCount()) break;
                     boolean dirDashAgg = isDirection && (col == 8 || col == 11 || col == 12 || col == 16 || col == 18 || col == 20);
                     vatChatModel.setValueAt(
                             dirDashAgg ? "-" : "<html><b>" + fmtTonBold(tongCat[col]) + "</b></html>",
@@ -909,6 +940,7 @@ public class Tab5_VatChatPanelService {
             }
 
             for (int col = 5; col <= 22; col++) {
+                if (col >= vatChatModel.getColumnCount()) break;
                 boolean dirDashAgg = isDirection && (col == 8 || col == 11 || col == 12 || col == 16 || col == 18 || col == 20);
                 vatChatModel.setValueAt(
                         dirDashAgg ? "-" : "<html><b>" + fmtTonBold(tongHuong[col]) + "</b></html>",
@@ -929,6 +961,7 @@ public class Tab5_VatChatPanelService {
 
         if (rowIdxToanD >= 0 && tongLlclAgg != null) {
             for (int col = 5; col <= 22; col++) {
+                if (col >= vatChatModel.getColumnCount()) break;
                 double v = sumDirectionsAgg[col] + tongLlclAgg[col];
                 vatChatModel.setValueAt("<html><b>" + fmtTonBold(v) + "</b></html>", rowIdxToanD, col);
             }
@@ -1021,7 +1054,9 @@ public class Tab5_VatChatPanelService {
         }
         String tenLower = tenVatChat == null ? "" : tenVatChat.toLowerCase(Locale.ROOT);
 
-        if (tenLower.contains("túi") || tenLower.contains("tui")) {
+        // Túi → check DVT thay vì tên
+        if (donViTinh != null && donViTinh.trim().toLowerCase(Locale.ROOT).startsWith("túi")
+                || donViTinh != null && donViTinh.trim().toLowerCase(Locale.ROOT).startsWith("tui")) {
             return quyUoc;
         }
 
@@ -1029,8 +1064,21 @@ public class Tab5_VatChatPanelService {
             return (quyUoc * quanSo) / 30.0;
         }
 
+        // ĐSTB (Đường sữa thương binh): (quyUoc/7) * (quanSo/100) — phải đứng trước nhánh %QS chung
+        if (isDuongSuaOrDstbTen(tenVatChat)) {
+            return (quyUoc / 7.0) * quanSo * 0.01;
+        }
+
         if (donViTinh != null && (donViTinh.contains("%QS") || donViTinh.contains("%"))) {
             return quyUoc * quanSo * 0.01;
+        }
+
+        // DVT: Bộ, Cái → quyUoc (không nhân quân số)
+        if (donViTinh != null) {
+            String dvtTrim = donViTinh.trim().toLowerCase(Locale.ROOT);
+            if (dvtTrim.equals("bộ") || dvtTrim.equals("bo") || dvtTrim.equals("cái") || dvtTrim.equals("cai")) {
+                return quyUoc;
+            }
         }
 
         return quyUoc * quanSo;
@@ -1151,7 +1199,7 @@ public class Tab5_VatChatPanelService {
         if (value == (long) value) {
             return String.format(Locale.US, "%d", (long) value);
         }
-        return String.format(Locale.US, "%.2f", value);
+        return String.format(Locale.US, "%.1f", value);
     }
 
     /**

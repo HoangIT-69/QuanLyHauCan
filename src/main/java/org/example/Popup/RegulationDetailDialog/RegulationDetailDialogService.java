@@ -13,7 +13,7 @@ public final class RegulationDetailDialogService {
     public static final Map<String, String[]> detailDataStore = new HashMap<>();
 
     public static final int SLOT_COUNT = 8;
-    public static final String[] DEFAULT_EIGHT = {"0", "0", "0", "0", "0", "0", "0", "0"};
+    public static final String[] DEFAULT_EIGHT = {"", "", "", "", "", "", "", ""};
 
     private RegulationDetailDialogService() {
     }
@@ -83,8 +83,8 @@ public final class RegulationDetailDialogService {
     }
 
     private static String toStoreToken(double d) {
-        if (Double.isNaN(d) || Double.isInfinite(d)) {
-            return "0";
+        if (Double.isNaN(d) || Double.isInfinite(d) || d == 0) {
+            return "";
         }
         if (d == (long) d) {
             return String.format("%d", (long) d);
@@ -127,7 +127,7 @@ public final class RegulationDetailDialogService {
 
     private static String safeNum(String s) {
         if (s == null || s.trim().isEmpty()) {
-            return "0";
+            return "";
         }
         return s.trim().replace(",", ".");
     }

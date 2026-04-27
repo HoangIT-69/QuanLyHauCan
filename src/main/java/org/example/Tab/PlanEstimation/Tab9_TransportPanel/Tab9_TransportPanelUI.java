@@ -109,7 +109,7 @@ public class Tab9_TransportPanelUI extends JPanel {
         addLeft(mainContainer, wrapTextAreaScroll(txtDuongVanTai, 100));
         mainContainer.add(Box.createVerticalStrut(16));
 
-        addLeft(mainContainer, UIUtils.createSectionLabel("2. Dự tính khối lượng vận chuyển (tự động từ Step 4)"));
+        addLeft(mainContainer, UIUtils.createSectionLabel("2. Dự tính khối lượng vận chuyển "));
         lblKlGdcb = new JLabel(" ");
         lblKlGdcd = new JLabel(" ");
         lblKlToanTran = new JLabel(" ");
@@ -323,9 +323,17 @@ public class Tab9_TransportPanelUI extends JPanel {
         double gdcb = snapshot.sumTieuThuGdcb;
         double gdcd = snapshot.sumTieuThuGdcd;
         double sum = gdcb + gdcd;
-        lblKlGdcb.setText("Khối lượng tiêu thụ GĐCB (tấn): " + Tab9_TransportPanelService.formatTon(gdcb));
-        lblKlGdcd.setText("Khối lượng tiêu thụ GĐCĐ (tấn): " + Tab9_TransportPanelService.formatTon(gdcd));
-        lblKlToanTran.setText("Khối lượng toàn trận — GĐCB + GĐCĐ (tấn): " + Tab9_TransportPanelService.formatTon(sum));
+        lblKlGdcb.setText("Khối lượng bổ sung GĐCB (tấn): " + Tab9_TransportPanelService.formatTon(gdcb));
+        lblKlGdcd.setText("Khối lượng bổ sung GĐCĐ (tấn): " + Tab9_TransportPanelService.formatTon(gdcd));
+        lblKlToanTran.setText("Khối lượng bổ sung toàn trận — GĐCB + GĐCĐ (tấn): " + Tab9_TransportPanelService.formatTon(sum));
+
+        // Tự động điền khối lượng cấp mình chuyển (tấn -> kg)
+        if (gdcb > 0) {
+            tfKlCapMinhGdcb.setText(String.valueOf((int) Math.round(gdcb * 1000)));
+        }
+        if (gdcd > 0) {
+            tfKlCapMinhGdcd.setText(String.valueOf((int) Math.round(gdcd * 1000)));
+        }
     }
 
     private void recalcTransport() {
