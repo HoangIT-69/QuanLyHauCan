@@ -53,6 +53,14 @@ public class Tab11_CommandPanelService {
         store.save(r);
     }
 
+    public Tab11Fields fetchOnlyCommanderFieldsFromStep1(int sessionId) {
+        Tab11Fields out = new Tab11Fields();
+        Step1ChiHuy s1 = fetchChiHuyFromStep1(sessionId);
+        out.chiHuy = s1.chiHuy;
+        out.nguoiThayThe = s1.nguoiThayThe;
+        return out;
+    }
+
     private static String nz(String s) {
         return s != null ? s : "";
     }

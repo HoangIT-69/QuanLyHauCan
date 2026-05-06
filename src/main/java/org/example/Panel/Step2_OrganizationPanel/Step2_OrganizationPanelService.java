@@ -6,6 +6,7 @@ import org.example.Utils.DBConnection;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,34 @@ public class Step2_OrganizationPanelService {
             return List.copyOf(DIRECTIONS_TIEN_CONG);
         }
         return List.copyOf(DIRECTIONS_TIEN_CONG);
+    }
+
+    public Set<String> loadSelectedDirectionsFromSession(int sessionId) {
+        Set<String> out = new LinkedHashSet<>();
+        if (sessionId <= 0) {
+            return out;
+        }
+        try (Connection conn = DBConnection.getConnection()) {
+            if (conn == null) {
+                return out;
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT step2_selected_huongs, cac_huong_enabled FROM sessions WHERE id = ?")) {
+                ps.setInt(1, sessionId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        String raw = rs.getString("step2_selected_huongs");
+                        out.addAll(parseDirections(raw));
+                        boolean enabled = rs.getInt("cac_huong_enabled") == 1;
+                        if (!enabled) {
+                            out.clear();
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
     }
 
     public Set<String> loadDistinctHuongFromDb(int sessionId) {
@@ -115,14 +144,13 @@ public class Step2_OrganizationPanelService {
      * Chỉ ghi đè DB cho hướng nào có dữ liệu thật trong RAM (rows không rỗng).
      * Hướng nào vector rỗng (chưa mở dialog) sẽ bỏ qua — giữ nguyên dữ liệu DB cũ.
      */
-    public boolean saveStep2FromRamStore(int sessionId) {
+    public boolean saveStep2FromRamStore(int sessionId, Set<String> selectedDirections) {
         Map<String, Vector<Vector<Object>>> store = UnitDataEntryDialogService.getSharedStore();
-        if (store == null || store.isEmpty()) {
-            return true;
-        }
         if (sessionId <= 0) {
             return false;
         }
+
+        Set<String> selected = normalizeDirectionSet(selectedDirections);
 
         try (Connection conn = DBConnection.getConnection()) {
             if (conn == null) {
@@ -130,63 +158,67 @@ public class Step2_OrganizationPanelService {
             }
             conn.setAutoCommit(false);
             try {
-                String sqlDel = "DELETE FROM step2_bien_che WHERE session_id = ? AND huong = ?";
-                String sqlIns = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, " +
-                        "(SELECT id FROM quyuoc_bienche WHERE CONCAT('[', nhom_don_vi, '] ', ten_don_vi) = ? LIMIT 1), ?)";
+                if (store != null && !store.isEmpty()) {
+                    String sqlDel = "DELETE FROM step2_bien_che WHERE session_id = ? AND huong = ?";
+                    String sqlIns = "INSERT INTO step2_bien_che (session_id, huong, quyuoc_id, phan_loai) VALUES (?, ?, " +
+                            "(SELECT id FROM quyuoc_bienche WHERE CONCAT('[', nhom_don_vi, '] ', ten_don_vi) = ? LIMIT 1), ?)";
 
-                try (PreparedStatement del = conn.prepareStatement(sqlDel);
-                     PreparedStatement ins = conn.prepareStatement(sqlIns)) {
+                    try (PreparedStatement del = conn.prepareStatement(sqlDel);
+                         PreparedStatement ins = conn.prepareStatement(sqlIns)) {
 
-                    // 1. Xóa DB các hướng đã bị xóa khỏi sa bàn (right-click delete)
-                    for (String huong : UnitDataEntryDialogService.getDeletedHuong()) {
-                        del.setInt(1, sessionId);
-                        del.setString(2, huong);
-                        del.addBatch();
-                    }
-
-                    // 2. Lưu các hướng có dữ liệu trong RAM (dialog đã được mở)
-                    for (Map.Entry<String, Vector<Vector<Object>>> entry : store.entrySet()) {
-                        String huong = entry.getKey();
-                        Vector<Vector<Object>> rows = entry.getValue();
-
-                        // Bỏ qua các key đặc biệt (sandbox node)
-                        if ("Tiểu đoàn".equals(huong) || "Phối thuộc".equals(huong)) {
-                            continue;
+                        // 1. Xóa DB các hướng đã bị xóa khỏi sa bàn (right-click delete)
+                        for (String huong : UnitDataEntryDialogService.getDeletedHuong()) {
+                            del.setInt(1, sessionId);
+                            del.setString(2, huong);
+                            del.addBatch();
                         }
 
-                        // Vector rỗng = dialog chưa bao giờ được mở → giữ nguyên DB
-                        if (rows == null || rows.isEmpty()) {
-                            continue;
-                        }
+                        // 2. Lưu các hướng có dữ liệu trong RAM (dialog đã được mở)
+                        for (Map.Entry<String, Vector<Vector<Object>>> entry : store.entrySet()) {
+                            String huong = entry.getKey();
+                            Vector<Vector<Object>> rows = entry.getValue();
 
-                        // Dialog đã mở (vector có ít nhất header rows) → xóa DB cũ rồi insert lại
-                        del.setInt(1, sessionId);
-                        del.setString(2, huong);
-                        del.addBatch();
+                            // Bỏ qua các key đặc biệt (sandbox node)
+                            if ("Tiểu đoàn".equals(huong) || "Phối thuộc".equals(huong)) {
+                                continue;
+                            }
 
-                        int currentLoai = 1;
-                        for (Vector<Object> row : rows) {
-                            if (row.isEmpty() || row.get(0) == null) continue;
-                            String rawName = row.get(0).toString();
+                            // Vector rỗng = dialog chưa bao giờ được mở → giữ nguyên DB
+                            if (rows == null || rows.isEmpty()) {
+                                continue;
+                            }
 
-                            if (rawName.startsWith("1.")) { currentLoai = 1; continue; }
-                            if (rawName.startsWith("2.")) { currentLoai = 2; continue; }
-                            if (rawName.equals("TỔNG CỘNG")) continue;
+                            // Dialog đã mở (vector có ít nhất header rows) → xóa DB cũ rồi insert lại
+                            del.setInt(1, sessionId);
+                            del.setString(2, huong);
+                            del.addBatch();
 
-                            String name = rawName.replace("  + ", "").trim();
-                            if (name.startsWith("[") && name.contains("]")) {
-                                ins.setInt(1, sessionId);
-                                ins.setString(2, huong);
-                                ins.setString(3, name);
-                                ins.setInt(4, currentLoai);
-                                ins.addBatch();
+                            int currentLoai = 1;
+                            for (Vector<Object> row : rows) {
+                                if (row.isEmpty() || row.get(0) == null) continue;
+                                String rawName = row.get(0).toString();
+
+                                if (rawName.startsWith("1.")) { currentLoai = 1; continue; }
+                                if (rawName.startsWith("2.")) { currentLoai = 2; continue; }
+                                if (rawName.equals("TỔNG CỘNG")) continue;
+
+                                String name = rawName.replace("  + ", "").trim();
+                                if (name.startsWith("[") && name.contains("]")) {
+                                    ins.setInt(1, sessionId);
+                                    ins.setString(2, huong);
+                                    ins.setString(3, name);
+                                    ins.setInt(4, currentLoai);
+                                    ins.addBatch();
+                                }
                             }
                         }
-                    }
 
-                    del.executeBatch();
-                    ins.executeBatch();
+                        del.executeBatch();
+                        ins.executeBatch();
+                    }
                 }
+
+                updateSessionDirectionSelection(conn, sessionId, selected);
 
                 conn.commit();
                 UnitDataEntryDialogService.clearDeletedHuong();
@@ -200,5 +232,49 @@ public class Step2_OrganizationPanelService {
             e.printStackTrace();
             return false;
         }
+    }
+
+    private void updateSessionDirectionSelection(Connection conn, int sessionId, Set<String> selected) throws Exception {
+        String sql = "UPDATE sessions SET cac_huong_enabled = ?, step2_selected_huongs = ? WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, selected.isEmpty() ? 0 : 1);
+            ps.setString(2, encodeSelectedDirections(selected));
+            ps.setInt(3, sessionId);
+            ps.executeUpdate();
+        }
+    }
+
+    private static Set<String> normalizeDirectionSet(Collection<String> raw) {
+        Set<String> out = new LinkedHashSet<>();
+        if (raw == null) {
+            return out;
+        }
+        for (String s : raw) {
+            if (s != null && !s.isBlank()) {
+                out.add(s.trim());
+            }
+        }
+        return out;
+    }
+
+    private static String encodeSelectedDirections(Set<String> selected) {
+        if (selected == null || selected.isEmpty()) {
+            return "";
+        }
+        return String.join("|", selected);
+    }
+
+    private static Set<String> parseDirections(String raw) {
+        Set<String> out = new LinkedHashSet<>();
+        if (raw == null || raw.isBlank()) {
+            return out;
+        }
+        String[] items = raw.split("\\|");
+        for (String s : items) {
+            if (s != null && !s.isBlank()) {
+                out.add(s.trim());
+            }
+        }
+        return out;
     }
 }

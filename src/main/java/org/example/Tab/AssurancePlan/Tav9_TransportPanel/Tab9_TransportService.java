@@ -93,7 +93,7 @@ public class Tab9_TransportService {
         data.put("<<bp_vt_cd>>", bpChienDau);
         data.put("<<bp_vt_sau>>", bpSauChienDau);
         
-        // Bảng 1: Khối lượng vận tải (13 cột, fix 11 dòng - có thêm dòng "Kho" ở GĐ chuẩn bị)
+        // Bảng 1: Khối lượng vận tải (13 cột model, fix 11 dòng - có thêm dòng "Kho" ở GĐ chuẩn bị)
         int b1Rows = 11;
         int b1Cols = 13;
         for (int r = 0; r < b1Rows; r++) {
@@ -104,6 +104,15 @@ public class Tab9_TransportService {
                     val = obj == null ? "" : obj.toString();
                 }
                 data.put("<<kl_r" + r + "_c" + c + ">>", val);
+            }
+
+            // Tương thích template PN_BDKH hiện tại:
+            // - c0, c1 giữ nguyên
+            // - c2 để trống
+            // - dữ liệu thực tế từ model c2..c12 được đặt vào key c3..c13
+            data.put("<<kl_r" + r + "_c2>>", "");
+            for (int templateCol = 3; templateCol <= 13; templateCol++) {
+                data.put("<<kl_r" + r + "_c" + templateCol + ">>", getCell(modelKhoiLuong, r, templateCol - 1));
             }
         }
 

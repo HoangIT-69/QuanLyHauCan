@@ -46,6 +46,7 @@ public class PN_PlanEstimationPanelUI extends JPanel {
     private JPanel contentPanel;
     private CardLayout cardLayout;
     private JButton currentSelectedBtn = null;
+    private JLabel lblTitle;
 
     private Tab1_EvaluationPanelUI tab1;
     private Tab2_MissionPanelUI tab2;
@@ -66,10 +67,9 @@ public class PN_PlanEstimationPanelUI extends JPanel {
         setOpaque(false);
         setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        String titleText = panelService.fetchTenVanKien(sessionId);
         String chiHuy = org.example.Utils.AppSession.getFullName();
 
-        JLabel lblTitle = new JLabel(titleText, SwingConstants.CENTER);
+        lblTitle = new JLabel(panelService.fetchTenVanKien(sessionId), SwingConstants.CENTER);
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
         lblTitle.setForeground(new Color(41, 128, 185));
         add(lblTitle, BorderLayout.NORTH);
@@ -78,7 +78,7 @@ public class PN_PlanEstimationPanelUI extends JPanel {
         Tab2_MissionPanelService tab2Svc = new Tab2_MissionPanelService();
 
         initTabs(tab1Svc, tab2Svc);
-        add(createFooterPanel(titleText, chiHuy), BorderLayout.SOUTH);
+        add(createFooterPanel(chiHuy), BorderLayout.SOUTH);
 
         if (menuPanel.getComponentCount() > 0) {
             ((JButton) menuPanel.getComponent(0)).doClick();
@@ -114,7 +114,7 @@ public class PN_PlanEstimationPanelUI extends JPanel {
         addTab("*Kết luận & Đề nghị", "tab12", tab12);
     }
 
-    private JPanel createFooterPanel(String titleText, String chiHuy) {
+    private JPanel createFooterPanel(String chiHuy) {
         JPanel pnlFooter = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         pnlFooter.setOpaque(false);
 
@@ -128,24 +128,25 @@ public class PN_PlanEstimationPanelUI extends JPanel {
             tab4.persistToDatabase();
             tab5.persistToDatabase();
             tab6.persistToDatabase();
+            tab8.persistToDatabase();
             tab10.persistToDatabase();
             tab11.persistToDatabase();
             tab12.persistToDatabase();
             JOptionPane.showMessageDialog(this,
-                    "Đã lưu bản nháp Tab I–VI và X–XII (các tab có lưu nháp vào pn_plan_estimation).",
+                    "Đã lưu bản nháp Tab I–VI, VIII và X–XII (các tab có lưu nháp vào pn_plan_estimation).",
                     "Thông báo",
                     JOptionPane.INFORMATION_MESSAGE);
         });
 
-        btnExport.addActionListener(e -> performExport(titleText, chiHuy));
+        btnExport.addActionListener(e -> performExport(chiHuy));
 
         pnlFooter.add(btnSave);
         pnlFooter.add(btnExport);
         return pnlFooter;
     }
 
-    private void performExport(String titleText, String chiHuy) {
-        Map<String, String> dataMap = collectExportData(titleText);
+    private void performExport(String chiHuy) {
+        Map<String, String> dataMap = collectExportData();
 
         java.io.InputStream templateStream = getClass().getResourceAsStream("/docs/template-PN_DKKH.docx");
         if (templateStream == null) {
@@ -188,8 +189,9 @@ public class PN_PlanEstimationPanelUI extends JPanel {
         }
     }
 
-    private Map<String, String> collectExportData(String titleText) {
+    private Map<String, String> collectExportData() {
         Map<String, String> dataMap = new HashMap<>();
+        String titleText = panelService.fetchTenVanKien(sessionId);
 
         safePut(dataMap, "header", () -> {
             dataMap.put("<<ten_van_kien>>", nz(titleText));
@@ -364,5 +366,48 @@ public class PN_PlanEstimationPanelUI extends JPanel {
 
     public Tab11_CommandPanelUI getTab11() {
         return tab11;
+    }
+
+    public int getSessionId() {
+        return sessionId;
+    }
+
+    public void onDeclarationDataChanged() {
+        refreshHeaderFromDeclaration();
+        refreshDataTablesOnly();
+    }
+
+    private void refreshHeaderFromDeclaration() {
+        if (lblTitle == null) {
+            return;
+        }
+        lblTitle.setText(panelService.fetchTenVanKien(sessionId));
+    }
+
+    /**
+     * Chỉ làm mới dữ liệu ở các bảng/nhãn tự tính, không reset text area hay JComboBox.
+     */
+    public void refreshDataTablesOnly() {
+        // Tab V — bảng vật chất
+        if (tab5 != null) {
+            tab5.refreshTable1();
+            tab5.refreshTable2();
+        }
+        // Tab VII — dự kiến TBBB (tự tính từ dữ liệu khai báo)
+        if (tab7 != null) {
+            tab7.applyTbbbFromDb();
+        }
+        // Tab VIII — bảng vũ khí hư hỏng
+        if (tab8 != null) {
+            tab8.loadDataFromDatabase(sessionId);
+        }
+        // Tab IX — nhãn khối lượng vận chuyển tự tính
+        if (tab9 != null) {
+            tab9.reloadSnapshot();
+        }
+        // Tab XI — người chỉ huy/người thay thế (lấy từ Step 1)
+        if (tab11 != null) {
+            tab11.refreshCommanderFieldsFromDeclaration();
+        }
     }
 }

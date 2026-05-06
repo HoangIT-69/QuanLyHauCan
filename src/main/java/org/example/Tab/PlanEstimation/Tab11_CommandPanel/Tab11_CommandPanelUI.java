@@ -117,6 +117,18 @@ public class Tab11_CommandPanelUI extends JPanel {
         service.save(sessionId, f);
     }
 
+    /**
+     * Làm mới riêng 2 ô auto-calc lấy từ Step 1, không đụng các ô nhập tay khác.
+     */
+    public void refreshCommanderFieldsFromDeclaration() {
+        if (sessionId < 1) {
+            return;
+        }
+        Tab11_CommandPanelService.Tab11Fields f = service.fetchOnlyCommanderFieldsFromStep1(sessionId);
+        txtChiHuy.setText(f.chiHuy != null ? f.chiHuy : "");
+        txtThayThe.setText(f.nguoiThayThe != null ? f.nguoiThayThe : "");
+    }
+
     public Map<String, String> getCommandData() {
         Map<String, String> data = new HashMap<>();
         data.put("<<trien_khai_ch>>", txtTrienKhai.getText().trim());

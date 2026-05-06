@@ -13,6 +13,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -117,9 +118,13 @@ public class Step2_OrganizationPanelUI extends JPanel {
         }
 
         Set<String> fromDb = step2Service.loadDistinctHuongFromDb(sid);
+        Set<String> selectedFromSession = step2Service.loadSelectedDirectionsFromSession(sid);
         Map<String, Vector<Vector<Object>>> store = UnitDataEntryDialogService.getSharedStore();
         for (String huong : fromDb) {
             store.put(huong, new Vector<>());
+        }
+        for (String huong : selectedFromSession) {
+            store.putIfAbsent(huong, new Vector<>());
         }
 
         initDefaultUnits();
@@ -236,13 +241,14 @@ public class Step2_OrganizationPanelUI extends JPanel {
             return false;
         }
 
+        Set<String> selectedDirections = collectSelectedDirections();
         Map<String, Vector<Vector<Object>>> store = UnitDataEntryDialogService.getSharedStore();
         if (store == null || store.isEmpty()) {
-            System.out.println("Cảnh báo: Dữ liệu unitDataStore đang trống. Bỏ qua lệnh Lưu để bảo toàn Database.");
-            return true;
+            // Không có dữ liệu biên chế trong RAM vẫn phải lưu trạng thái chọn hướng để Step 3 khóa/mở cột đúng.
+            return step2Service.saveStep2FromRamStore(sid, selectedDirections);
         }
 
-        boolean ok = step2Service.saveStep2FromRamStore(sid);
+        boolean ok = step2Service.saveStep2FromRamStore(sid, selectedDirections);
         if (!ok) {
             JOptionPane.showMessageDialog(this, "Có lỗi xảy ra khi lưu biên chế. Dữ liệu cũ đã được khôi phục!", "Lỗi", JOptionPane.ERROR_MESSAGE);
             return false;
@@ -252,6 +258,20 @@ public class Step2_OrganizationPanelUI extends JPanel {
 
     public boolean saveToDatabase() {
         return saveStep2ToDatabase();
+    }
+
+    public boolean isCacHuongEnabled() {
+        return !collectSelectedDirections().isEmpty();
+    }
+
+    private Set<String> collectSelectedDirections() {
+        Set<String> out = new LinkedHashSet<>();
+        for (String name : unitButtons.keySet()) {
+            if (directionLabels.contains(name)) {
+                out.add(name);
+            }
+        }
+        return out;
     }
 
     private void initDefaultUnits() {

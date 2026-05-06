@@ -319,6 +319,13 @@ public class Tab9_TransportPanelUI extends JPanel {
         }
     }
 
+    /** Reload khối lượng vận chuyển tự tính khi dữ liệu khai báo thay đổi (không reset text nhập tay). */
+    public void reloadSnapshot() {
+        this.snapshot = service.loadTransportSnapshot(sessionId);
+        applySnapshotLabels();
+        recalcTransport();
+    }
+
     private void applySnapshotLabels() {
         double gdcb = snapshot.sumTieuThuGdcb;
         double gdcd = snapshot.sumTieuThuGdcd;

@@ -66,6 +66,7 @@ public class Step4_RegulationPanelUI extends JPanel {
             boolean t3 = t2 && tab3.saveToDatabase(sessionId);
 
             if (s1 && s2 && s3 && t1 && t2 && t3) {
+                parent.notifyPlanningPanelsDeclarationChanged();
                 JOptionPane.showMessageDialog(this, "Đã lưu toàn bộ dữ liệu Quy định thành công!", "Hoàn tất", JOptionPane.INFORMATION_MESSAGE);
             } else {
                 JOptionPane.showMessageDialog(this, "Có lỗi xảy ra khi lưu dữ liệu, vui lòng kiểm tra Console!", "Lỗi", JOptionPane.ERROR_MESSAGE);

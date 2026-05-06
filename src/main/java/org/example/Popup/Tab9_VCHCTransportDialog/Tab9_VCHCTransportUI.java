@@ -22,6 +22,9 @@ public class Tab9_VCHCTransportUI extends JDialog {
     private static final Color HOVER_COLOR = new Color(219, 234, 254);
     private static final Color DISABLED_COLOR = new Color(226, 232, 240);
 
+    private static final String TOAN_DOI = "Toàn đội";
+    private static final String TOAN_D = "Toàn d";
+
     private final String phaseTitle;
     private final int targetRow;
     private final int filterCategoryIndex;
@@ -90,7 +93,7 @@ public class Tab9_VCHCTransportUI extends JDialog {
 
         mainPanel.add(northPanel, BorderLayout.NORTH);
 
-        String weightColName = phaseTitle.contains("chuan bi") ? "Khoi luong GDCB" : "Khoi luong GDCD";
+        String weightColName = isPreparationPhase() ? "Khoi luong GDCB" : "Khoi luong GDCD";
         String[] columnNames = {"Chon", "TT", "Ten vat chat", weightColName};
 
         model = new DefaultTableModel(columnNames, 0) {
@@ -105,9 +108,34 @@ public class Tab9_VCHCTransportUI extends JDialog {
                 String label = getValueAt(row, 2).toString().trim();
                 String key = selectedHuong + "::" + label;
                 Integer assignedRow = currentAssignments.get(key);
-                return assignedRow == null || assignedRow == targetRow;
+                if (assignedRow != null && assignedRow != targetRow) return false;
+                // Khóa xung đột Toàn đội ↔ hướng cụ thể
+                return !isLockedByConflict(label);
             }
         };
+
+        model.addTableModelListener(e -> {
+            if (e.getType() != javax.swing.event.TableModelEvent.UPDATE) return;
+            if (e.getColumn() != 0) return;
+            int row = e.getFirstRow();
+            if (row < 0 || row >= model.getRowCount()) return;
+            if (selectedHuong == null || selectedHuong.isEmpty()) return;
+
+            String label = model.getValueAt(row, 2).toString().trim();
+            String key = selectedHuong + "::" + label;
+            boolean isChecked = Boolean.TRUE.equals(model.getValueAt(row, 0));
+            if (isChecked) {
+                currentAssignments.put(key, targetRow);
+            } else {
+                Integer assignedRow = currentAssignments.get(key);
+                if (assignedRow != null && assignedRow == targetRow) {
+                    currentAssignments.remove(key);
+                }
+            }
+            if (table != null) {
+                table.repaint();
+            }
+        });
 
         populateTable();
 
@@ -136,7 +164,9 @@ public class Tab9_VCHCTransportUI extends JDialog {
                 String label = t.getValueAt(row, 2).toString().trim();
                 String key = selectedHuong + "::" + label;
                 Integer assignedRow = currentAssignments.get(key);
-                if (assignedRow != null && assignedRow != targetRow) {
+                boolean lockedByOtherRow = assignedRow != null && assignedRow != targetRow;
+                boolean lockedByConflict = isLockedByConflict(label);
+                if (lockedByOtherRow || lockedByConflict) {
                     c.setBackground(DISABLED_COLOR);
                     c.setForeground(Color.GRAY);
                 } else {
@@ -191,6 +221,40 @@ public class Tab9_VCHCTransportUI extends JDialog {
         setContentPane(mainPanel);
     }
 
+    /**
+     * Kiểm tra xem vật chất (label) có bị khóa do xung đột Toàn đội/Hướng không.
+     * - Đang ở Toàn đội: khóa nếu đã tích ở bất kỳ hướng cụ thể nào.
+     * - Đang ở hướng cụ thể: khóa nếu đã tích ở Toàn đội.
+     */
+    private boolean isLockedByConflict(String label) {
+        if (isToanDoiScope(selectedHuong)) {
+            return hasAssignmentForLabelInScope(label, false);
+        }
+        return hasAssignmentForLabelInScope(label, true);
+    }
+
+    private boolean isToanDoiScope(String huong) {
+        if (huong == null) return false;
+        String h = huong.trim();
+        return TOAN_DOI.equalsIgnoreCase(h) || TOAN_D.equalsIgnoreCase(h);
+    }
+
+    private boolean hasAssignmentForLabelInScope(String label, boolean toanDoiScope) {
+        String suffix = "::" + label;
+        for (Map.Entry<String, Integer> e : currentAssignments.entrySet()) {
+            if (e.getValue() == null || e.getValue() != targetRow) continue;
+            String key = e.getKey();
+            if (key == null || !key.endsWith(suffix)) continue;
+            int sep = key.indexOf("::");
+            String huong = sep >= 0 ? key.substring(0, sep) : "";
+            boolean isToanDoiEntry = isToanDoiScope(huong);
+            if (toanDoiScope == isToanDoiEntry) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void populateTable() {
         model.setRowCount(0);
         if (selectedHuong == null || selectedHuong.isEmpty()) return;
@@ -200,21 +264,27 @@ public class Tab9_VCHCTransportUI extends JDialog {
         Map<String, Map<String, Double>> data = (dirData != null && !dirData.isEmpty()) ? dirData : toanD;
 
         int stt = 1;
-        for (Map.Entry<String, Map<String, Double>> entry : data.entrySet()) {
-            String label = entry.getKey().trim();
+        Map<String, Map<String, Double>> orderedSource = toanD.isEmpty() ? data : toanD;
+        for (Map.Entry<String, Map<String, Double>> entry : orderedSource.entrySet()) {
+            String label = entry.getKey() != null ? entry.getKey().trim() : "";
             Map<String, Double> toanDValues = toanD.get(label);
             if (toanDValues == null) continue;
             double catIdx = toanDValues.getOrDefault("CATEGORY", -1.0);
             if (Math.round(catIdx) != filterCategoryIndex) continue;
 
-            Map<String, Double> values = entry.getValue();
+            Map<String, Double> values = data.get(label);
+            if (values == null) {
+                values = toanDValues;
+            }
             double gdcbKho = values.getOrDefault(Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_KHO, 0.0);
             double gdcbDv  = values.getOrDefault(Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_DV_D, 0.0);
             double gdcdKho = values.getOrDefault(Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_KHO, 0.0);
             double gdcdDv  = values.getOrDefault(Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_DV, 0.0);
-            double gdcb = gdcbKho + gdcbDv;
-            double gdcd = gdcdKho + gdcdDv;
-            double displayWeight = phaseTitle.contains("chuan bi") ? gdcb : gdcd;
+            // Theo nghiệp vụ: ở Hướng thì Kho = 0 (chỉ lấy ĐV); Toàn đội mới lấy Kho + ĐV.
+            boolean isToanDoi = isToanDoiScope(selectedHuong);
+            double gdcb = isToanDoi ? (gdcbKho + gdcbDv) : gdcbDv;
+            double gdcd = isToanDoi ? (gdcdKho + gdcdDv) : gdcdDv;
+            double displayWeight = isPreparationPhase() ? gdcb : gdcd;
 
             String key = selectedHuong + "::" + label;
             Integer assignedRow = currentAssignments.get(key);
@@ -225,8 +295,9 @@ public class Tab9_VCHCTransportUI extends JDialog {
     }
 
     private void confirmSelection() {
+        // Chỉ xóa các keys của hướng này mà đang trỏ về targetRow hiện tại
         String prefix = selectedHuong + "::";
-        currentAssignments.keySet().removeIf(k -> k.startsWith(prefix));
+        currentAssignments.entrySet().removeIf(entry -> entry.getKey().startsWith(prefix) && entry.getValue() == targetRow);
 
         for (int i = 0; i < model.getRowCount(); i++) {
             boolean isChecked = (Boolean) model.getValueAt(i, 0);
@@ -240,5 +311,11 @@ public class Tab9_VCHCTransportUI extends JDialog {
             onConfirm.accept(currentAssignments);
         }
         dispose();
+    }
+
+    private boolean isPreparationPhase() {
+        if (phaseTitle == null) return false;
+        String s = phaseTitle.toLowerCase(Locale.ROOT);
+        return s.contains("chuẩn bị") || s.contains("chuan bi");
     }
 }

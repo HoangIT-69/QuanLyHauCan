@@ -2,6 +2,7 @@ package org.example.Popup.Tab5_VatChatPanel;
 
 import org.example.Utils.DBConnection;
 import org.example.Utils.InputValidator;
+import org.example.Utils.VchcCalcUtils;
 
 import javax.swing.table.DefaultTableModel;
 import java.sql.Connection;
@@ -16,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 
 /**
  * JDBC và tính toán bảng vật chất (Tab 5 popup). {@code type}: 1 = VCHC, 2 = VTKT.
@@ -90,8 +89,6 @@ public class Tab5_VatChatPanelService {
     private static final String GROUP_4 = "4. VTKT";
 
     private static final String[] GROUPS_IN_ORDER = {GROUP_1, GROUP_2, GROUP_3, GROUP_4};
-    private static final String[] ROMAN = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
-
     private enum SectionType { TOAN_D, HUONG, LLC }
 
     private record Personnel(int quanSoD, int quanSoPt) {
@@ -137,7 +134,7 @@ public class Tab5_VatChatPanelService {
         Map<String, List<VchcItem>> groups = loadAndGroupQuyUocVchcStrict();
 
         // Phase 3-4: render khung chuẩn
-        appendHauCanSection(model, romanLabel(0) + ". Toàn d", toanD, groups, SectionType.TOAN_D);
+        appendHauCanSection(model, VchcCalcUtils.romanLabel(0) + ". Toàn d", toanD, groups, SectionType.TOAN_D);
 
         List<String> huongs = loadDistinctHuong(sessionId);
         for (int i = 0; i < huongs.size(); i++) {
@@ -145,7 +142,7 @@ public class Tab5_VatChatPanelService {
             Personnel p = personnelByHuong.getOrDefault(huong, new Personnel(0, 0));
             boolean isLLC = huong.toLowerCase(Locale.ROOT).contains("lực lượng còn lại");
             SectionType type = isLLC ? SectionType.LLC : SectionType.HUONG;
-            appendHauCanSection(model, romanLabel(i + 1) + ". " + huong, p, groups, type);
+            appendHauCanSection(model, VchcCalcUtils.romanLabel(i + 1) + ". " + huong, p, groups, type);
         }
     }
 
@@ -188,82 +185,24 @@ public class Tab5_VatChatPanelService {
 
         switch (type) {
             case TOAN_D -> {
-                double tlD = calcTlHauCan(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoD());
-                double tlPt = calcTlHauCan(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoPt());
-                r[2] = fmt2(tlD + tlPt);
-                r[3] = fmt2(tlD);
-                r[4] = fmt2(tlPt);
+                double tlD = VchcCalcUtils.calculateTL(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoD());
+                double tlPt = VchcCalcUtils.calculateTL(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoPt());
+                r[2] = VchcCalcUtils.fmt2(tlD + tlPt);
+                r[3] = VchcCalcUtils.fmt2(tlD);
+                r[4] = VchcCalcUtils.fmt2(tlPt);
             }
             case HUONG -> {
-                r[2] = fmt2(calcTlHauCan(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoD()));
+                r[2] = VchcCalcUtils.fmt2(VchcCalcUtils.calculateTL(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoD()));
                 r[3] = "-";
                 r[4] = "-";
             }
             case LLC -> {
-                r[2] = fmt2(calcTlHauCan(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoPt()));
+                r[2] = VchcCalcUtils.fmt2(VchcCalcUtils.calculateTL(it.tenVatChat(), it.quyUoc(), it.donViTinh(), p.quanSoPt()));
                 r[3] = "-";
                 r[4] = "-";
             }
         }
         return r;
-    }
-
-    /**
-     * Công thức tính TL ĐVT dùng chung cho itemRow5 và calculateTL (bảng 5 cột Hậu cần).
-     * Phân loại theo DVT, xử lý các trường hợp đặc biệt:
-     * - DVT Túi            → quyUoc (không nhân QS)
-     * - Tên Dầu thắp       → quyUoc * quanSo / 30
-     * - Tên ĐSTB           → (quyUoc/7) * quanSo * 0.01
-     * - DVT %QS/%          → quyUoc * quanSo * 0.01
-     * - DVT Bộ/Cái         → quyUoc (không nhân QS)
-     * - Mặc định           → quyUoc * quanSo
-     */
-    private double calcTlHauCan(String ten, double quyUoc, String dvt, double quanSo) {
-        if (quanSo == 0) return 0;
-        String dvtLower = dvt != null ? dvt.trim().toLowerCase(Locale.ROOT) : "";
-        String tenLower = ten != null ? ten.toLowerCase(Locale.ROOT) : "";
-
-        if (dvtLower.startsWith("túi") || dvtLower.startsWith("tui")) {
-            return quyUoc;
-        }
-        if (tenLower.contains("dầu thắp") || tenLower.contains("dau thap")) {
-            return (quyUoc * quanSo) / 30.0;
-        }
-        if (isDuongSuaOrDstbTen(ten)) {
-            return (quyUoc / 7.0) * quanSo * 0.01;
-        }
-        if (dvtLower.contains("%")) {
-            return quyUoc * quanSo * 0.01;
-        }
-        if (dvtLower.equals("bộ") || dvtLower.equals("bo") || dvtLower.equals("cái") || dvtLower.equals("cai")) {
-            return quyUoc;
-        }
-        return quyUoc * quanSo;
-    }
-
-    private static boolean isPercentUnit(String donViTinh) {
-        if (donViTinh == null) {
-            return false;
-        }
-        String t = donViTinh.trim();
-        if (t.isEmpty()) {
-            return false;
-        }
-        return t.contains("%") || t.toUpperCase(Locale.ROOT).contains("%QS");
-    }
-
-    private static String fmt2(double v) {
-        return String.format(Locale.US, "%.1f", v);
-    }
-
-    private static String romanLabel(int idx) {
-        if (idx < 0) {
-            idx = 0;
-        }
-        if (idx >= ROMAN.length) {
-            idx = ROMAN.length - 1;
-        }
-        return ROMAN[idx];
     }
 
     /**
@@ -403,79 +342,6 @@ public class Tab5_VatChatPanelService {
         double[] gdcd = new double[6];
     }
 
-    private static int huongDetailIndex(String huongName) {
-        if (huongName == null) return 0;
-        if ("Toàn d".equals(huongName)) return 0;
-        if (huongName.contains("chủ yếu")) return 2;
-        if (huongName.contains("thứ yếu")) return 3;
-        if (huongName.contains("phía sau") || huongName.contains("vòng ngoài")) return 4;
-        String low = huongName.toLowerCase();
-        if (low.contains("ll") && huongName.contains("còn lại")) return 5;
-        return 1;
-    }
-
-    private static double at(double[] a, int i) {
-        if (a == null || i < 0 || i >= a.length) return 0;
-        return a[i];
-    }
-
-    /** Hệ số / định mức dòng con: bỏ .00 vô nghĩa (10 → "10", 1.5 → "1.5"). */
-    private static String fmtCoeff(double v) {
-        if (Double.isNaN(v) || Double.isInfinite(v)) {
-            return "0";
-        }
-        if (Math.abs(v) < 1e-12) {
-            return "0";
-        }
-        DecimalFormat df = new DecimalFormat("#.#", DecimalFormatSymbols.getInstance(Locale.US));
-        df.setGroupingUsed(false);
-        String s = df.format(v);
-        if (s.contains(".")) {
-            s = s.replaceAll("0+$", "").replaceAll("\\.$", "");
-        }
-        return s.isEmpty() ? "0" : s;
-    }
-
-    /** Trọng lượng dòng tổng in đậm: luôn 1 chữ số thập phân (tấn). */
-    private static String fmtTonBold(double v) {
-        return String.format(Locale.US, "%.1f", v);
-    }
-
-    /** Đường sữa / ĐSTB (tên vật chất). */
-    private static boolean isDuongSuaOrDstbTen(String ten) {
-        if (ten == null) {
-            return false;
-        }
-        String t = ten.toLowerCase(Locale.ROOT);
-        return t.contains("đường sữa") || t.contains("duong sua")
-                || t.contains("đstb") || t.contains("dstb");
-    }
-
-    /** Chỉ tại block Hướng: ĐSTB → cả dòng số thành "-". LLCL hiển thị bình thường. */
-    private static boolean isHuongDstbFullDash(String ten, boolean isDirection) {
-        return isDirection && isDuongSuaOrDstbTen(ten);
-    }
-
-    /**
-     * PT gạch theo nghiệp vụ; tại LLCL không áp dụng gạch PT riêng cho Đường sữa (hiển thị đủ như Toàn d).
-     */
-    private static boolean computePtExc(String ten, int catIndex, int type, boolean llclBlock) {
-        if (llclBlock && isDuongSuaOrDstbTen(ten)) {
-            return false;
-        }
-        return isPtExcludedVatChat(ten, catIndex, type);
-    }
-
-    private static double[] parse6(String s) {
-        double[] res = new double[6];
-        if (s == null || s.isEmpty()) return res;
-        String[] p = s.split(",", -1);
-        for (int i = 0; i < Math.min(6, p.length); i++) {
-            res[i] = InputValidator.parseDoubleSafe(p[i].trim());
-        }
-        return res;
-    }
-
     public void loadDataFromDatabase(int sessionId, int type, DefaultTableModel vatChatModel) {
         vatChatModel.setRowCount(0);
         if (sessionId <= 0) {
@@ -533,7 +399,7 @@ public class Tab5_VatChatPanelService {
         List<ItemData> listVTKT = new ArrayList<>();
 
         boolean includeVtktInVchc = (type == 1);
-        String sqlData = "SELECT s4.*, s3.kho_d as hc_kho_d, s3.don_vi as hc_don_vi, COALESCE(s3.ll_cd_vong_ngoai, s3.phoi_thuoc) as hc_phoi_thuoc, "
+        String sqlData = "SELECT s4.*, s3.kho_d as hc_kho_d, s3.don_vi as hc_don_vi, s3.phoi_thuoc as hc_phoi_thuoc, "
                 + "qv.quy_uoc, qv.danh_muc, qv.don_vi_tinh " +
                 "FROM step4_quy_dinh_du_tru s4 " +
                 "LEFT JOIN step3_vat_chat s3 ON s4.session_id = s3.session_id AND s4.vat_chat = s3.vat_chat AND s4.loai_vat_chat = s3.loai_vat_chat " +
@@ -560,22 +426,22 @@ public class Tab5_VatChatPanelService {
                 item.wHcDonVi = rs.getDouble("hc_don_vi");
                 item.wHcPhoiThuoc = rs.getDouble("hc_phoi_thuoc");
 
-                item.pc04 = parse6(rs.getString("pc04_chitiet"));
-                item.scd = parse6(rs.getString("scd_chitiet"));
-                item.gdcb = parse6(rs.getString("gdcb_chitiet"));
-                item.gdcd = parse6(rs.getString("gdcd_chitiet"));
+                item.pc04 = VchcCalcUtils.parse6(rs.getString("pc04_chitiet"));
+                item.scd = VchcCalcUtils.parse6(rs.getString("scd_chitiet"));
+                item.gdcb = VchcCalcUtils.parse6(rs.getString("gdcb_chitiet"));
+                item.gdcd = VchcCalcUtils.parse6(rs.getString("gdcd_chitiet"));
 
                 // Phase 2: ghép số liệu gốc cho Toàn d (sẽ copy cho mọi Hướng)
                 item.baseQddt = item.wQddt;
                 item.baseTtGdcb = item.wTtGdcb;
                 item.baseTtGdcd = item.wTtGdcd;
 
-                // PC SCĐ: ưu tiên bóc tách từ scd_chitiet[0],[1], fallback từ phai_co_scd
-                double scdKho = at(item.scd, 0);
-                double scdDv = at(item.scd, 1);
+                // PC SCĐ: lấy từ scd_chitiet[0]=Kho, [1]=Đơn vị; nếu chưa nhập thì Kho=0, ĐV=tổng
+                double scdKho = VchcCalcUtils.at(item.scd, 0);
+                double scdDv = VchcCalcUtils.at(item.scd, 1);
                 if (Math.abs(scdKho) + Math.abs(scdDv) < 1e-9) {
-                    scdKho = item.wPcScd * 0.5;
-                    scdDv = item.wPcScd * 0.5;
+                    scdKho = 0;
+                    scdDv = item.wPcScd;
                 }
                 item.basePcScdKhoD = scdKho;
                 item.basePcScdDv = scdDv;
@@ -586,12 +452,12 @@ public class Tab5_VatChatPanelService {
                 item.baseHcDvD = item.wHcDonVi;
                 item.baseHcDvPt = item.wHcPhoiThuoc;
 
-                // PC TQĐ: ưu tiên bóc tách từ pc04_chitiet[0],[1], fallback từ phai_co_0400
-                double pc04Kho = at(item.pc04, 0);
-                double pc04Dv = at(item.pc04, 1);
+                // PC TQĐ: lấy từ pc04_chitiet[0]=Kho, [1]=Đơn vị; nếu chưa nhập thì Kho=0, ĐV=tổng
+                double pc04Kho = VchcCalcUtils.at(item.pc04, 0);
+                double pc04Dv = VchcCalcUtils.at(item.pc04, 1);
                 if (Math.abs(pc04Kho) + Math.abs(pc04Dv) < 1e-9) {
-                    pc04Kho = item.wPcTqd * 0.5;
-                    pc04Dv = item.wPcTqd * 0.5;
+                    pc04Kho = 0;
+                    pc04Dv = item.wPcTqd;
                 }
                 item.basePcTqdKhoD = pc04Kho;
                 item.basePcTqdDv = pc04Dv;
@@ -645,9 +511,6 @@ public class Tab5_VatChatPanelService {
         Map<String, double[]> toanDKhoNumSnapByTen = new LinkedHashMap<>();
 
         int huongIndex = 0;
-        double[] sumDirectionsAgg = new double[27];
-        int rowIdxToanD = -1;
-        double[] tongLlclAgg = null;
 
         // Tích lũy TL vận chuyển theo nhóm (chỉ khối Toàn d, type=1): [0]=QN, [1]=QY, [2]=DT, [3]=VTKT
         double[] catGdcb = new double[4];
@@ -667,9 +530,6 @@ public class Tab5_VatChatPanelService {
             boolean hasPT = true;
 
             int rowHuongIdx = vatChatModel.getRowCount();
-            if (isToanD) {
-                rowIdxToanD = rowHuongIdx;
-            }
             Object[] rowHuong = new Object[27];
             Arrays.fill(rowHuong, "");
             int laIdx = Math.min(huongIndex, laMa.length - 1);
@@ -693,7 +553,7 @@ public class Tab5_VatChatPanelService {
                 double[] tongCat = new double[27];
 
                 for (ItemData item : catLists[c]) {
-                    if (isHuongDstbFullDash(item.ten, isDirection)) {
+                    if (VchcCalcUtils.isHuongDstbFullDash(item.ten, isDirection)) {
                         Object[] rowDash = new Object[27];
                         Arrays.fill(rowDash, "-");
                         rowDash[0] = item.ten;
@@ -707,18 +567,18 @@ public class Tab5_VatChatPanelService {
                         continue;
                     }
 
-                    boolean ptExc = computePtExc(item.ten, c, type, isLlcl);
+                    boolean ptExc = VchcCalcUtils.computePtExc(item.ten, c, type, isLlcl);
 
                     double tlDvtToanD;
                     double tlDvtD;
                     double tlDvtPT;
                     if (isToanD) {
-                        tlDvtD = calculateTL(item.ten, item.quyUoc, item.donViTinhQuyUoc, quanSo_d_ToanD);
-                        tlDvtPT = calculateTL(item.ten, item.quyUoc, item.donViTinhQuyUoc, quanSo_pt_ToanD);
+                        tlDvtD = VchcCalcUtils.calculateTL(item.ten, item.quyUoc, item.donViTinhQuyUoc, quanSo_d_ToanD);
+                        tlDvtPT = VchcCalcUtils.calculateTL(item.ten, item.quyUoc, item.donViTinhQuyUoc, quanSo_pt_ToanD);
                         tlDvtToanD = tlDvtD + tlDvtPT;
                     } else {
-                        tlDvtD = calculateTL(item.ten, item.quyUoc, item.donViTinhQuyUoc, quanSoDHuong);
-                        tlDvtPT = calculateTL(item.ten, item.quyUoc, item.donViTinhQuyUoc, quanSoPTHuong);
+                        tlDvtD = VchcCalcUtils.calculateTL(item.ten, item.quyUoc, item.donViTinhQuyUoc, quanSoDHuong);
+                        tlDvtPT = VchcCalcUtils.calculateTL(item.ten, item.quyUoc, item.donViTinhQuyUoc, quanSoPTHuong);
                         tlDvtToanD = tlDvtD + tlDvtPT;
                     }
 
@@ -760,83 +620,92 @@ public class Tab5_VatChatPanelService {
                     row[1] = item.dvt;
                     if (isDirection) {
                         // Các hướng: TL Toàn d = quanSoD, d và PT để "-"
-                        row[2] = fmtCoeff(tlDvtD);
+                        row[2] = VchcCalcUtils.fmtCoeff(tlDvtD);
                         row[3] = "-";
                         row[4] = "-";
                     } else if (isLlcl) {
                         // Lực lượng còn lại: TL Toàn d = quanSoPt (phối thuộc), d và PT để "-"
-                        row[2] = fmtCoeff(tlDvtPT);
+                        row[2] = VchcCalcUtils.fmtCoeff(tlDvtPT);
                         row[3] = "-";
                         row[4] = "-";
                     } else {
                         // Toàn d: hiển thị đầy đủ
-                        row[2] = fmtCoeff(tlDvtToanD);
-                        row[3] = fmtCoeff(tlDvtD);
-                        row[4] = ptExc ? "-" : fmtCoeff(tlDvtPT);
+                        row[2] = VchcCalcUtils.fmtCoeff(tlDvtToanD);
+                        row[3] = VchcCalcUtils.fmtCoeff(tlDvtD);
+                        row[4] = ptExc ? "-" : VchcCalcUtils.fmtCoeff(tlDvtPT);
                     }
 
-                    row[5] = fmtCoeff(wQddt);
-                    row[6] = fmtCoeff(wTtGdcb);
-                    row[7] = fmtCoeff(wTtGdcd);
+                    row[5] = VchcCalcUtils.fmtCoeff(wQddt);
+                    row[6] = VchcCalcUtils.fmtCoeff(wTtGdcb);
+                    row[7] = VchcCalcUtils.fmtCoeff(wTtGdcd);
 
                     double s0 = scdKho;
                     double s1 = scdDv;
                     double s2 = wPcScd;
                     if (isDirection) {
                         row[8] = "-";
-                        row[9] = fmtCoeff(s1);
-                        row[10] = fmtCoeff(s1);
+                        row[9] = VchcCalcUtils.fmtCoeff(s1);
+                        row[10] = VchcCalcUtils.fmtCoeff(s1);
                     } else {
-                        row[8] = fmtCoeff(s0);
-                        row[9] = fmtCoeff(s1);
-                        row[10] = fmtCoeff(s2);
+                        row[8] = VchcCalcUtils.fmtCoeff(s0);
+                        row[9] = VchcCalcUtils.fmtCoeff(s1);
+                        row[10] = VchcCalcUtils.fmtCoeff(s2);
                     }
 
-                    row[11] = hasKho ? fmtCoeff(wHcKhoD) : "-";
-                    row[12] = hasKho && !ptExc ? fmtCoeff(khoPtForCols) : "-";
-                    row[13] = fmtCoeff(wHcDonVi);
-                    row[14] = (isDirection || !hasPT || ptExc) ? "-" : fmtCoeff(wHcPhoiThuoc);
-                    row[15] = fmtCoeff(hcSumDisplay);
+                    row[11] = hasKho ? VchcCalcUtils.fmtCoeff(wHcKhoD) : "-";
+                    row[12] = hasKho && !ptExc ? VchcCalcUtils.fmtCoeff(khoPtForCols) : "-";
+                    row[13] = VchcCalcUtils.fmtCoeff(wHcDonVi);
+                    row[14] = (isDirection || !hasPT || ptExc) ? "-" : VchcCalcUtils.fmtCoeff(wHcPhoiThuoc);
+                    row[15] = VchcCalcUtils.fmtCoeff(hcSumDisplay);
 
                     if (isDirection) {
-                        addTonWeighted(tongCat, 5, wQddt, tlDvtD);
-                        addTonWeighted(tongCat, 6, wTtGdcb, tlDvtD);
-                        addTonWeighted(tongCat, 7, wTtGdcd, tlDvtD);
-                        addTonWeighted(tongCat, 9, s1, tlDvtD);
-                        addTonWeighted(tongCat, 10, s1, tlDvtD);
-                        addTonWeighted(tongCat, 13, wHcDonVi, tlDvtD);
-                        addTonWeighted(tongCat, 15, wHcDonVi, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 5, wQddt, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 6, wTtGdcb, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 7, wTtGdcd, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 9, s1, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 10, s1, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 13, wHcDonVi, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 15, wHcDonVi, tlDvtD);
                     } else {
-                        addTonWeighted(tongCat, 5, wQddt, tlDvtToanD);
-                        addTonWeighted(tongCat, 6, wTtGdcb, tlDvtToanD);
-                        addTonWeighted(tongCat, 7, wTtGdcd, tlDvtToanD);
-                        addTonWeighted(tongCat, 8, s0, tlDvtToanD);
-                        addTonWeighted(tongCat, 9, s1, tlDvtToanD);
-                        addTonWeighted(tongCat, 10, s2, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 5, wQddt, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 6, wTtGdcb, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 7, wTtGdcd, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 8, s0, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 9, s1, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 10, s2, tlDvtToanD);
                         if (hasKho) {
-                            addTonWeighted(tongCat, 11, wHcKhoD, tlDvtToanD);
+                            VchcCalcUtils.addTonWeighted(tongCat, 11, wHcKhoD, tlDvtToanD);
                             if (!ptExc) {
-                                addTonWeighted(tongCat, 12, khoPtForCols, tlDvtToanD);
+                                VchcCalcUtils.addTonWeighted(tongCat, 12, khoPtForCols, tlDvtToanD);
                             }
                         }
-                        addTonWeighted(tongCat, 13, wHcDonVi, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 13, wHcDonVi, tlDvtD);
                         if (hasPT && !ptExc) {
-                            addTonWeighted(tongCat, 14, wHcPhoiThuoc, tlDvtPT);
+                            VchcCalcUtils.addTonWeighted(tongCat, 14, wHcPhoiThuoc, tlDvtPT);
                         }
-                        addTonWeighted(tongCat, 15, hcKhoForBs + hcDvForBs, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 15, hcKhoForBs + hcDvForBs, tlDvtToanD);
                     }
 
                     double pcTqdKho = hasKho ? pcTqdKhoRaw : 0;
                     double pcTqdDv = pcTqdDvRaw;
-                    double ttGdcdKho = hasKho ? (wTtGdcd * 0.5) : 0;
-                    double ttGdcdDv = wTtGdcd - ttGdcdKho;
 
-                    double b16 = pcTqdKho - hcKhoForBs;
-                    double b17 = pcTqdDv - hcDvForBs;
-                    double b18 = b16;
-                    double b19 = b17;
-                    double b20 = s0 + ttGdcdKho - pcTqdKho;
-                    double b21 = s1 + ttGdcdDv - pcTqdDv;
+                    // Cột PC TQĐ lấy trực tiếp từ bảng chi tiết 04.00-N (Kho/ĐV).
+                    double b16 = pcTqdKho;
+                    double b17 = pcTqdDv;
+
+                    // Bổ sung theo công thức nghiệp vụ:
+                    // - GĐCB Kho/d(d): PC TQĐ - HC
+                    // - GĐCB Kho/d(PT): PC TQĐ (cột PT không hiển thị trên UI, chỉ dùng cho tổng vận chuyển)
+                    // - GĐCB ĐV(d): PC TQĐ + TT GĐCB - HC(d)
+                    // - GĐCB ĐV(PT): PC TQĐ + TT GĐCB - HC(PT)
+                    // - GĐCĐ Kho/d(d): PC SCĐ + TT GĐCĐ - PC TQĐ
+                    // - GĐCĐ ĐV(d):  PC SCĐ + TT GĐCĐ - PC TQĐ
+                    double b18 = pcTqdKho - hcKhoForBs;
+                    double b18Pt = hasPT && !isDirection && !ptExc ? pcTqdKho : 0;
+                    double b19 = (pcTqdDv + wTtGdcb) - wHcDonVi;
+                    double b19Pt = hasPT && !isDirection && !ptExc ? (pcTqdDv + wTtGdcb - wHcPhoiThuoc) : 0;
+                    double b20 = s0 + wTtGdcd - pcTqdKho;
+                    double b21 = s1 + wTtGdcd - pcTqdDv;
 
                     if (isLlcl) {
                         double[] snB = toanDKhoNumSnapByTen.get(item.ten);
@@ -847,26 +716,26 @@ public class Tab5_VatChatPanelService {
                         }
                     }
 
-                    row[16] = hasKho ? fmtCoeff(b16) : "-";
-                    row[17] = fmtCoeff(b17);
-                    row[18] = hasKho ? fmtCoeff(b18) : "-";
-                    row[19] = fmtCoeff(b19);
-                    row[20] = fmtCoeff(b20);
-                    row[21] = fmtCoeff(b21);
+                    row[16] = hasKho ? VchcCalcUtils.fmtCoeff(b16) : "-";
+                    row[17] = VchcCalcUtils.fmtCoeff(b17);
+                    row[18] = hasKho ? VchcCalcUtils.fmtCoeff(b18) : "-";
+                    row[19] = VchcCalcUtils.fmtCoeff(b19);
+                    row[20] = VchcCalcUtils.fmtCoeff(b20);
+                    row[21] = VchcCalcUtils.fmtCoeff(b21);
                     row[22] = "";
 
                     if (isDirection) {
-                        addTonWeighted(tongCat, 17, b17, tlDvtD);
-                        addTonWeighted(tongCat, 19, b19, tlDvtD);
-                        addTonWeighted(tongCat, 21, b21, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 17, b17, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 19, b19, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 21, b21, tlDvtD);
                         tongCat[22] += (b19 * tlDvtD + b21 * tlDvtD) / 1000.0;
                     } else {
-                        addTonWeighted(tongCat, 16, b16, tlDvtToanD);
-                        addTonWeighted(tongCat, 17, b17, tlDvtD);
-                        addTonWeighted(tongCat, 18, b18, tlDvtToanD);
-                        addTonWeighted(tongCat, 19, b19, tlDvtD);
-                        addTonWeighted(tongCat, 20, b20, tlDvtToanD);
-                        addTonWeighted(tongCat, 21, b21, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 16, b16, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 17, b17, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 18, b18, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 19, b19, tlDvtD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 20, b20, tlDvtToanD);
+                        VchcCalcUtils.addTonWeighted(tongCat, 21, b21, tlDvtD);
                     }
 
                     row[23] = "";
@@ -874,31 +743,41 @@ public class Tab5_VatChatPanelService {
                     row[25] = "";
                     row[26] = "";
 
-                    if (type == 1 && isToanD && !isDuongSuaThuongBinh(item.ten)) {
-                        // Bổ sung chỉ có Kho và ĐV, không có PT
+                    if (type == 1 && isToanD && !VchcCalcUtils.isDuongSuaThuongBinh(item.ten)) {
+                        // UI hiển thị Kho/ĐV; phần PT được tính ngầm cho tổng vận chuyển.
                         // GĐCB Kho/d × TL Toàn d (khớp addTonWeighted col 18)
                         double tonGdcbKho = b18 * tlDvtToanD / 1000.0;
+                        // GĐCB Kho/d (PT) × TL Toàn d
+                        double tonGdcbKhoPt = b18Pt * tlDvtToanD / 1000.0;
                         // GĐCB ĐV × TL d (khớp addTonWeighted col 19)
                         double tonGdcbDv  = b19 * tlDvtD     / 1000.0;
+                        // GĐCB ĐV (PT) × TL PT
+                        double tonGdcbDvPt = b19Pt * tlDvtPT / 1000.0;
                         // GĐCĐ Kho/d × TL Toàn d (khớp addTonWeighted col 20)
                         double tonGdcdKho = b20 * tlDvtToanD / 1000.0;
                         // GĐCĐ ĐV × TL d (khớp addTonWeighted col 21)
                         double tonGdcdDv  = b21 * tlDvtD     / 1000.0;
-                        double tonPlus = tonGdcbKho + tonGdcbDv + tonGdcdKho + tonGdcdDv;
+                        double tonPlus = tonGdcbKho + tonGdcbKhoPt + tonGdcbDv + tonGdcbDvPt + tonGdcdKho + tonGdcdDv;
                         recordMiniTableVchcRow(item.ten, c,
-                                tonGdcbKho, tonGdcbDv, tonGdcdKho, tonGdcdDv, tonPlus);
-                    } else if (type == 1 && isDirection && !isDuongSuaThuongBinh(item.ten)) {
+                                tonGdcbKho, tonGdcbKhoPt, tonGdcbDv, tonGdcbDvPt, tonGdcdKho, tonGdcdDv, tonPlus);
+                    } else if (type == 1 && isDirection && !VchcCalcUtils.isDuongSuaThuongBinh(item.ten)) {
                         double tonGdcbKho = b18 * tlDvtToanD / 1000.0;
+                        double tonGdcbKhoPt = b18Pt * tlDvtToanD / 1000.0;
                         double tonGdcbDv  = b19 * tlDvtD     / 1000.0;
+                        double tonGdcbDvPt = b19Pt * tlDvtPT / 1000.0;
                         double tonGdcdKho = b20 * tlDvtToanD / 1000.0;
                         double tonGdcdDv  = b21 * tlDvtD     / 1000.0;
+                        double tonPlus = tonGdcbKho + tonGdcbKhoPt + tonGdcbDv + tonGdcbDvPt + tonGdcdKho + tonGdcdDv;
                         synchronized (MINI_VCHC_LOCK) {
                             miniTableVCHCByDirection.computeIfAbsent(huongName, k -> new ConcurrentHashMap<>());
                             Map<String, Double> cmDir = new LinkedHashMap<>();
                             cmDir.put(TL_BO_SUNG_GDCB_KHO, Math.max(0, tonGdcbKho));
+                            cmDir.put(TL_BO_SUNG_GDCB_KHO_PT, Math.max(0, tonGdcbKhoPt));
                             cmDir.put(TL_BO_SUNG_GDCB_DV_D, Math.max(0, tonGdcbDv));
+                            cmDir.put(TL_BO_SUNG_GDCB_DV_PT, Math.max(0, tonGdcbDvPt));
                             cmDir.put(TL_BO_SUNG_GDCD_KHO, Math.max(0, tonGdcdKho));
                             cmDir.put(TL_BO_SUNG_GDCD_DV, Math.max(0, tonGdcdDv));
+                            cmDir.put(TL_BO_SUNG_TOTAL, Math.max(0, tonPlus));
                             miniTableVCHCByDirection.get(huongName).put(item.ten, cmDir);
                         }
                     }
@@ -931,7 +810,7 @@ public class Tab5_VatChatPanelService {
                     if (col >= vatChatModel.getColumnCount()) break;
                     boolean dirDashAgg = isDirection && (col == 8 || col == 11 || col == 12 || col == 16 || col == 18 || col == 20);
                     vatChatModel.setValueAt(
-                            dirDashAgg ? "-" : "<html><b>" + fmtTonBold(tongCat[col]) + "</b></html>",
+                            dirDashAgg ? "-" : "<html><b>" + VchcCalcUtils.fmtTonBold(tongCat[col]) + "</b></html>",
                             rowCatIdx,
                             col
                     );
@@ -943,39 +822,46 @@ public class Tab5_VatChatPanelService {
                 if (col >= vatChatModel.getColumnCount()) break;
                 boolean dirDashAgg = isDirection && (col == 8 || col == 11 || col == 12 || col == 16 || col == 18 || col == 20);
                 vatChatModel.setValueAt(
-                        dirDashAgg ? "-" : "<html><b>" + fmtTonBold(tongHuong[col]) + "</b></html>",
+                        dirDashAgg ? "-" : "<html><b>" + VchcCalcUtils.fmtTonBold(tongHuong[col]) + "</b></html>",
                         rowHuongIdx,
                         col
                 );
             }
 
-            if (isDirection) {
-                for (int i = 0; i < 27; i++) {
-                    sumDirectionsAgg[i] += tongHuong[i];
-                }
-            }
-            if (isLlcl) {
-                tongLlclAgg = Arrays.copyOf(tongHuong, 27);
-            }
-        }
-
-        if (rowIdxToanD >= 0 && tongLlclAgg != null) {
-            for (int col = 5; col <= 22; col++) {
-                if (col >= vatChatModel.getColumnCount()) break;
-                double v = sumDirectionsAgg[col] + tongLlclAgg[col];
-                vatChatModel.setValueAt("<html><b>" + fmtTonBold(v) + "</b></html>", rowIdxToanD, col);
-            }
+            // Giữ tổng của từng block như đã tính trong chính block đó.
         }
 
         // Ghi TL vận chuyển theo nhóm vào globalTonnageVCHC_ByCat
         if (type == 1) {
+            // Tính lại theo miniTable để bao gồm cả phần PT của GĐCB.
+            Arrays.fill(catGdcb, 0.0);
+            Arrays.fill(catGdcd, 0.0);
+            synchronized (MINI_VCHC_LOCK) {
+                for (Map<String, Double> m : miniTableVCHC.values()) {
+                    int cat = (int) Math.round(m.getOrDefault("CATEGORY", -1.0));
+                    if (cat < 0 || cat >= 4) {
+                        continue;
+                    }
+                    double gdcb = m.getOrDefault(TL_BO_SUNG_GDCB_KHO, 0.0)
+                            + m.getOrDefault(TL_BO_SUNG_GDCB_KHO_PT, 0.0)
+                            + m.getOrDefault(TL_BO_SUNG_GDCB_DV_D, 0.0)
+                            + m.getOrDefault(TL_BO_SUNG_GDCB_DV_PT, 0.0);
+                    double gdcd = m.getOrDefault(TL_BO_SUNG_GDCD_KHO, 0.0)
+                            + m.getOrDefault(TL_BO_SUNG_GDCD_DV, 0.0);
+                    catGdcb[cat] += gdcb;
+                    catGdcd[cat] += gdcd;
+                }
+            }
+
             String[] catKeys = {CAT_QN, CAT_QY, CAT_DT, CAT_VTKT};
             globalTonnageVCHC_ByCat.clear();
             for (int i = 0; i < 4; i++) {
                 Map<String, Double> cm = new LinkedHashMap<>();
-                cm.put(TL_GDCB,      catGdcb[i]);
-                cm.put(TL_GDCD,      catGdcd[i]);
-                cm.put(TL_TOAN_TRAN, catGdcb[i] + catGdcd[i]);
+                double gdcb = Math.max(0.0, catGdcb[i]);
+                double gdcd = Math.max(0.0, catGdcd[i]);
+                cm.put(TL_GDCB,      gdcb);
+                cm.put(TL_GDCD,      gdcd);
+                cm.put(TL_TOAN_TRAN, gdcb + gdcd);
                 globalTonnageVCHC_ByCat.put(catKeys[i], cm);
             }
             System.out.printf(Locale.US,
@@ -987,40 +873,35 @@ public class Tab5_VatChatPanelService {
         // Cộng dồn tổng 7 cột Bổ sung (tấn) từ miniTableVCHC vào globalTonnageVCHC
         if (type == 1) {
             synchronized (MINI_VCHC_LOCK) {
-                double sumGdcbKho = 0, sumGdcbDv = 0;
+                double sumGdcbKho = 0, sumGdcbKhoPt = 0, sumGdcbDv = 0, sumGdcbDvPt = 0;
                 double sumGdcdKho = 0, sumGdcdDv = 0, sumPlus = 0;
                 for (Map<String, Double> m : miniTableVCHC.values()) {
                     sumGdcbKho += m.getOrDefault(TL_BO_SUNG_GDCB_KHO,   0.0);
+                    sumGdcbKhoPt += m.getOrDefault(TL_BO_SUNG_GDCB_KHO_PT, 0.0);
                     sumGdcbDv  += m.getOrDefault(TL_BO_SUNG_GDCB_DV_D,  0.0);
+                    sumGdcbDvPt += m.getOrDefault(TL_BO_SUNG_GDCB_DV_PT, 0.0);
                     sumGdcdKho += m.getOrDefault(TL_BO_SUNG_GDCD_KHO,   0.0);
                     sumGdcdDv  += m.getOrDefault(TL_BO_SUNG_GDCD_DV,    0.0);
                     sumPlus    += m.getOrDefault(TL_BO_SUNG_TOTAL,       0.0);
                 }
                 globalTonnageVCHC.put(TL_BO_SUNG_GDCB_KHO,   sumGdcbKho);
+                globalTonnageVCHC.put(TL_BO_SUNG_GDCB_KHO_PT, sumGdcbKhoPt);
                 globalTonnageVCHC.put(TL_BO_SUNG_GDCB_DV_D,  sumGdcbDv);
+                globalTonnageVCHC.put(TL_BO_SUNG_GDCB_DV_PT, sumGdcbDvPt);
                 globalTonnageVCHC.put(TL_BO_SUNG_GDCD_KHO,   sumGdcdKho);
                 globalTonnageVCHC.put(TL_BO_SUNG_GDCD_DV,    sumGdcdDv);
                 globalTonnageVCHC.put(TL_BO_SUNG_TOTAL,       sumPlus);
             }
             System.out.printf(Locale.US,
-                    "[VCHC-TỔNG] GĐCBKho=%7.3f GĐCBDv=%7.3f | GĐCĐKho=%7.3f GĐCĐDv=%7.3f | (+)=%7.3f (tấn)%n",
+                    "[VCHC-TỔNG] GĐCBKho(d)=%7.3f GĐCBKho(PT)=%7.3f GĐCBDv(d)=%7.3f GĐCBDv(PT)=%7.3f | GĐCĐKho=%7.3f GĐCĐDv=%7.3f | (+)=%7.3f (tấn)%n",
                     globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCB_KHO,  0.0),
+                    globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCB_KHO_PT, 0.0),
                     globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCB_DV_D, 0.0),
+                    globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCB_DV_PT, 0.0),
                     globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCD_KHO,  0.0),
                     globalTonnageVCHC.getOrDefault(TL_BO_SUNG_GDCD_DV,   0.0),
                     globalTonnageVCHC.getOrDefault(TL_BO_SUNG_TOTAL,      0.0));
         }
-    }
-
-    private static void addTon(double[] tongCat, int col, double kg) {
-        tongCat[col] += kg / 1000.0;
-    }
-
-    /**
-     * Cộng dồn trọng lượng cho dòng tổng (tấn): hệ số * TL ĐVT tương ứng / 1000.
-     */
-    private static void addTonWeighted(double[] tongCat, int col, double heSo, double tlDvt) {
-        tongCat[col] += (heSo * tlDvt) / 1000.0;
     }
 
     private List<String> loadDistinctHuongForVatChat(int sessionId) {
@@ -1042,52 +923,6 @@ public class Tab5_VatChatPanelService {
             e.printStackTrace();
         }
         return list;
-    }
-
-    /**
-     * TL ĐVT: Túi y sĩ / y tá / cứu thương… = {@code quyUoc} (không nhân QS). Đường sữa/ĐSTB: render Hướng (Phase 3)
-     * gạch dòng; LLCL/Toàn d nhân QS bình thường. %QS và dầu thắp giữ như cũ.
-     */
-    private double calculateTL(String tenVatChat, double quyUoc, String donViTinh, double quanSo) {
-        if (quanSo == 0) {
-            return 0;
-        }
-        String tenLower = tenVatChat == null ? "" : tenVatChat.toLowerCase(Locale.ROOT);
-
-        // Túi → check DVT thay vì tên
-        if (donViTinh != null && donViTinh.trim().toLowerCase(Locale.ROOT).startsWith("túi")
-                || donViTinh != null && donViTinh.trim().toLowerCase(Locale.ROOT).startsWith("tui")) {
-            return quyUoc;
-        }
-
-        if (tenLower.contains("dầu thắp") || tenLower.contains("dau thap")) {
-            return (quyUoc * quanSo) / 30.0;
-        }
-
-        // ĐSTB (Đường sữa thương binh): (quyUoc/7) * (quanSo/100) — phải đứng trước nhánh %QS chung
-        if (isDuongSuaOrDstbTen(tenVatChat)) {
-            return (quyUoc / 7.0) * quanSo * 0.01;
-        }
-
-        if (donViTinh != null && (donViTinh.contains("%QS") || donViTinh.contains("%"))) {
-            return quyUoc * quanSo * 0.01;
-        }
-
-        // DVT: Bộ, Cái → quyUoc (không nhân quân số)
-        if (donViTinh != null) {
-            String dvtTrim = donViTinh.trim().toLowerCase(Locale.ROOT);
-            if (dvtTrim.equals("bộ") || dvtTrim.equals("bo") || dvtTrim.equals("cái") || dvtTrim.equals("cai")) {
-                return quyUoc;
-            }
-        }
-
-        return quyUoc * quanSo;
-    }
-
-    private static double parseCellTon(Object cell) {
-        if (cell == null || "-".equals(cell)) return 0;
-        String s = cell.toString().replace(",", ".").replaceAll("<[^>]+>", "");
-        return InputValidator.parseDoubleSafe(s);
     }
 
     /**
@@ -1124,43 +959,16 @@ public class Tab5_VatChatPanelService {
         return Collections.unmodifiableMap(new LinkedHashMap<>(globalTonnageVCHC_ByCat));
     }
 
-    private static boolean isDuongSuaThuongBinh(String ten) {
-        if (ten == null) {
-            return false;
-        }
-        return ten.trim().equalsIgnoreCase("Đường sữa thương binh");
-    }
-
     /**
-     * Ngoại lệ PT: không mang vác — gạch cột PT; VTKT (panel 2) hoặc nhóm VTKT trong VCHC (cat 3).
-     * Túi*, Đường sữa* (trừ task sau cho TB). TL ĐVT Toàn d vẫn d+PT.
-     */
-    private static boolean isPtExcludedVatChat(String ten, int catIndex, int panelType) {
-        if (panelType == 2) {
-            return true;
-        }
-        if (ten == null) {
-            return false;
-        }
-        String t = ten.toLowerCase(Locale.ROOT);
-        if (t.contains("túi") || t.contains("tui")) {
-            return true;
-        }
-        if (t.contains("đường sữa") || t.contains("duong sua")) {
-            return true;
-        }
-        return catIndex == 3;
-    }
-
-    /**
-     * Lưu 7 TL bổ sung (tấn) cho từng vật chất vào {@link #miniTableVCHC} và cộng dồn vào {@link #globalTonnageVCHC}.
-     * In ra console để kiểm tra (tương tự Tab5_DanPanel).
+     * Lưu 7 TL bổ sung (tấn) cho từng vật chất vào {@link #miniTableVCHC}.
      */
     private void recordMiniTableVchcRow(
             String tenVatChat,
             int catIndex,
             double tonGdcbKho,
+            double tonGdcbKhoPt,
             double tonGdcbDv,
+            double tonGdcbDvPt,
             double tonGdcdKho,
             double tonGdcdDv,
             double tonPlus
@@ -1171,7 +979,9 @@ public class Tab5_VatChatPanelService {
         Map<String, Double> m = new LinkedHashMap<>();
         m.put("CATEGORY", (double) catIndex);
         m.put(TL_BO_SUNG_GDCB_KHO, tonGdcbKho);
+        m.put(TL_BO_SUNG_GDCB_KHO_PT, tonGdcbKhoPt);
         m.put(TL_BO_SUNG_GDCB_DV_D, tonGdcbDv);
+        m.put(TL_BO_SUNG_GDCB_DV_PT, tonGdcbDvPt);
         m.put(TL_BO_SUNG_GDCD_KHO,  tonGdcdKho);
         m.put(TL_BO_SUNG_GDCD_DV,   tonGdcdDv);
         m.put(TL_BO_SUNG_TOTAL,      tonPlus);
@@ -1186,20 +996,10 @@ public class Tab5_VatChatPanelService {
         else if (catIndex == 3) catPrefix = "VTKT";
         
         System.out.printf(Locale.US,
-                "[%s] %-30s | GĐCBKho=%7.3f GĐCBDv=%7.3f | GĐCĐKho=%7.3f GĐCĐDv=%7.3f | (+)=%7.3f (tấn)%n",
+            "[%s] %-30s | GĐCBKho(d)=%7.3f GĐCBKho(PT)=%7.3f GĐCBDv(d)=%7.3f GĐCBDv(PT)=%7.3f | GĐCĐKho=%7.3f GĐCĐDv=%7.3f | (+)=%7.3f (tấn)%n",
                 catPrefix, tenVatChat.trim(),
-                tonGdcbKho + 0.0, tonGdcbDv + 0.0,
-                tonGdcdKho + 0.0, tonGdcdDv + 0.0, tonPlus + 0.0);
-    }
-
-    private String f(double value) {
-        if (Math.abs(value) < 1e-12) {
-            return "0";
-        }
-        if (value == (long) value) {
-            return String.format(Locale.US, "%d", (long) value);
-        }
-        return String.format(Locale.US, "%.1f", value);
+            tonGdcbKho + 0.0, tonGdcbKhoPt + 0.0, tonGdcbDv + 0.0, tonGdcbDvPt + 0.0,
+            tonGdcdKho + 0.0, tonGdcdDv + 0.0, tonPlus + 0.0);
     }
 
     /**
@@ -1277,7 +1077,7 @@ public class Tab5_VatChatPanelService {
                         // wordCell 1..27 → UI col 0..26
                         int uiCol = wordCell - 1;
                         if (uiCol < UI_COLS) {
-                            val = vcCellStr(uiRow[uiCol]);
+                            val = VchcCalcUtils.vcCellStr(uiRow[uiCol]);
                         }
                     }
                 }
@@ -1285,14 +1085,5 @@ public class Tab5_VatChatPanelService {
             }
         }
         return data;
-    }
-
-    /** Chuyển giá trị ô model sang String an toàn. Strip HTML tags. Bỏ "-". */
-    private static String vcCellStr(Object o) {
-        if (o == null) return "";
-        String s = o.toString().trim();
-        // Strip HTML tags (header rows dùng <html><b>...</b></html>)
-        s = s.replaceAll("<[^>]+>", "").trim();
-        return "-".equals(s) ? "" : s;
     }
 }

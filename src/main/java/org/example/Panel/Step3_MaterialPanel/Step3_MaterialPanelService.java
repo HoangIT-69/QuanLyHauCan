@@ -10,6 +10,7 @@ import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -137,6 +138,16 @@ public class Step3_MaterialPanelService {
 
         public static LoadedGroups empty() {
             return new LoadedGroups(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        }
+    }
+
+    public static final class Step2SelectionState {
+        public final boolean cacHuongEnabled;
+        public final Set<String> selectedDirections;
+
+        public Step2SelectionState(boolean cacHuongEnabled, Set<String> selectedDirections) {
+            this.cacHuongEnabled = cacHuongEnabled;
+            this.selectedDirections = selectedDirections != null ? selectedDirections : new LinkedHashSet<>();
         }
     }
 
@@ -385,6 +396,53 @@ public class Step3_MaterialPanelService {
         }
     }
 
+    public Step2SelectionState loadStep2SelectionState(int sessionId) {
+        Set<String> selected = new LinkedHashSet<>();
+        boolean enabled = false;
+        if (sessionId <= 0) {
+            return new Step2SelectionState(false, selected);
+        }
+
+        try (Connection conn = DBConnection.getConnection()) {
+            if (conn == null) {
+                return new Step2SelectionState(false, selected);
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT cac_huong_enabled, step2_selected_huongs FROM sessions WHERE id = ?")) {
+                ps.setInt(1, sessionId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        enabled = rs.getInt("cac_huong_enabled") == 1;
+                        selected = parseDirections(rs.getString("step2_selected_huongs"));
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+
+            if (selected.isEmpty()) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT DISTINCT huong FROM step2_bien_che WHERE session_id = ?")) {
+                    ps.setInt(1, sessionId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String huong = rs.getString("huong");
+                            if (huong != null && !huong.isBlank()) {
+                                selected.add(huong.trim());
+                            }
+                        }
+                    }
+                }
+                if (!enabled) {
+                    enabled = !selected.isEmpty();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new Step2SelectionState(enabled, selected);
+    }
+
     public static final class Step3SaveRow {
         public final int loai;
         public final String vatChat;
@@ -417,9 +475,23 @@ public class Step3_MaterialPanelService {
     }
 
     private static String formatDouble(double d) {
-        if (d == (long) d) {
-            return String.format("%d", (long) d);
+        java.math.BigDecimal bd = java.math.BigDecimal.valueOf(d)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+        String txt = bd.stripTrailingZeros().toPlainString();
+        return txt.replace('.', ',');
+    }
+
+    private static Set<String> parseDirections(String raw) {
+        Set<String> out = new LinkedHashSet<>();
+        if (raw == null || raw.isBlank()) {
+            return out;
         }
-        return String.format("%s", d).replace(".", ",");
+        String[] items = raw.split("\\|");
+        for (String s : items) {
+            if (s != null && !s.isBlank()) {
+                out.add(s.trim());
+            }
+        }
+        return out;
     }
 }

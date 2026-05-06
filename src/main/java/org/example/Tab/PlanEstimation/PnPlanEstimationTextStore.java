@@ -38,6 +38,14 @@ public final class PnPlanEstimationTextStore {
         public String tab11BcCd2 = "";
         public String tab12KetLuan = "";
         public String tab12DeNghi = "";
+        // Tab VIII — Bảo dưỡng, Sửa chữa
+        public String tab8BdChuanBi = "";
+        public String tab8BdChienDau = "";
+        public String tab8BdSauCd = "";
+        public String tab8CanDoi = "";
+        public String tab8ScChuanBi = "";
+        public String tab8ScChienDau = "";
+        public String tab8ScSauCd = "";
     }
 
     public PlanEstimationRow load(int sessionId) {
@@ -53,7 +61,9 @@ public final class PnPlanEstimationTextStore {
                 + "tab10_tinh_huong, tab10_bien_phap, "
                 + "tab11_trien_khai, tab11_chi_huy, tab11_nguoi_thay_the, tab11_tt_cb, tab11_tt_cd, "
                 + "tab11_bc_cb, tab11_bc_cd1, tab11_bc_cd2, "
-                + "tab12_ket_luan, tab12_de_nghi "
+                + "tab12_ket_luan, tab12_de_nghi, "
+                + "tab8_bd_chuan_bi, tab8_bd_chien_dau, tab8_bd_sau_cd, "
+                + "tab8_can_doi, tab8_sc_chuan_bi, tab8_sc_chien_dau, tab8_sc_sau_cd "
                 + "FROM pn_plan_estimation WHERE session_id = ?";
         try (Connection conn = DBConnection.getConnection()) {
             if (conn == null) {
@@ -88,6 +98,13 @@ public final class PnPlanEstimationTextStore {
                         row.tab11BcCd2 = nz(safeCol(rs, "tab11_bc_cd2"));
                         row.tab12KetLuan = nz(safeCol(rs, "tab12_ket_luan"));
                         row.tab12DeNghi = nz(safeCol(rs, "tab12_de_nghi"));
+                        row.tab8BdChuanBi = nz(safeCol(rs, "tab8_bd_chuan_bi"));
+                        row.tab8BdChienDau = nz(safeCol(rs, "tab8_bd_chien_dau"));
+                        row.tab8BdSauCd = nz(safeCol(rs, "tab8_bd_sau_cd"));
+                        row.tab8CanDoi = nz(safeCol(rs, "tab8_can_doi"));
+                        row.tab8ScChuanBi = nz(safeCol(rs, "tab8_sc_chuan_bi"));
+                        row.tab8ScChienDau = nz(safeCol(rs, "tab8_sc_chien_dau"));
+                        row.tab8ScSauCd = nz(safeCol(rs, "tab8_sc_sau_cd"));
                     }
                 }
             }
@@ -120,8 +137,10 @@ public final class PnPlanEstimationTextStore {
                 + "tab10_tinh_huong, tab10_bien_phap, "
                 + "tab11_trien_khai, tab11_chi_huy, tab11_nguoi_thay_the, tab11_tt_cb, tab11_tt_cd, "
                 + "tab11_bc_cb, tab11_bc_cd1, tab11_bc_cd2, "
-                + "tab12_ket_luan, tab12_de_nghi) "
-                + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                + "tab12_ket_luan, tab12_de_nghi, "
+                + "tab8_bd_chuan_bi, tab8_bd_chien_dau, tab8_bd_sau_cd, "
+                + "tab8_can_doi, tab8_sc_chuan_bi, tab8_sc_chien_dau, tab8_sc_sau_cd) "
+                + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 + "ON DUPLICATE KEY UPDATE danh_gia = VALUES(danh_gia), nhiem_vu = VALUES(nhiem_vu), "
                 + "to_chuc = VALUES(to_chuc), bo_tri = VALUES(bo_tri), "
                 + "tab4_chi_tieu = VALUES(tab4_chi_tieu), tab4_chuan_bi = VALUES(tab4_chuan_bi), tab4_chien_dau = VALUES(tab4_chien_dau), "
@@ -131,7 +150,9 @@ public final class PnPlanEstimationTextStore {
                 + "tab11_trien_khai = VALUES(tab11_trien_khai), tab11_chi_huy = VALUES(tab11_chi_huy), tab11_nguoi_thay_the = VALUES(tab11_nguoi_thay_the), "
                 + "tab11_tt_cb = VALUES(tab11_tt_cb), tab11_tt_cd = VALUES(tab11_tt_cd), "
                 + "tab11_bc_cb = VALUES(tab11_bc_cb), tab11_bc_cd1 = VALUES(tab11_bc_cd1), tab11_bc_cd2 = VALUES(tab11_bc_cd2), "
-                + "tab12_ket_luan = VALUES(tab12_ket_luan), tab12_de_nghi = VALUES(tab12_de_nghi)";
+                + "tab12_ket_luan = VALUES(tab12_ket_luan), tab12_de_nghi = VALUES(tab12_de_nghi), "
+                + "tab8_bd_chuan_bi = VALUES(tab8_bd_chuan_bi), tab8_bd_chien_dau = VALUES(tab8_bd_chien_dau), tab8_bd_sau_cd = VALUES(tab8_bd_sau_cd), "
+                + "tab8_can_doi = VALUES(tab8_can_doi), tab8_sc_chuan_bi = VALUES(tab8_sc_chuan_bi), tab8_sc_chien_dau = VALUES(tab8_sc_chien_dau), tab8_sc_sau_cd = VALUES(tab8_sc_sau_cd)";
         try (Connection conn = DBConnection.getConnection()) {
             if (conn == null) {
                 return;
@@ -163,7 +184,14 @@ public final class PnPlanEstimationTextStore {
                 ps.setString(i++, r.tab11BcCd1);
                 ps.setString(i++, r.tab11BcCd2);
                 ps.setString(i++, r.tab12KetLuan);
-                ps.setString(i, r.tab12DeNghi);
+                ps.setString(i++, r.tab12DeNghi);
+                ps.setString(i++, r.tab8BdChuanBi);
+                ps.setString(i++, r.tab8BdChienDau);
+                ps.setString(i++, r.tab8BdSauCd);
+                ps.setString(i++, r.tab8CanDoi);
+                ps.setString(i++, r.tab8ScChuanBi);
+                ps.setString(i++, r.tab8ScChienDau);
+                ps.setString(i, r.tab8ScSauCd);
                 ps.executeUpdate();
             }
         } catch (Exception e) {

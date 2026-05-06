@@ -290,13 +290,14 @@ public class Tab5_DanPanelService {
     /**
      * KHTN cơ số (20–27):
      * <ul>
-     *   <li>Trước nổ súng (PC TQĐ định mức chung trừ Hiện có d/PT): ĐV 20=17−11, 21=17−12; Kho 23=18−14, 24=18−15.</li>
-     *   <li>Thực hành nổ súng (gom ĐV/Kho; GĐCĐ chỉ cộng ĐV): 26=8+6−17, 27=9−18.</li>
+     *   <li>Trước nổ súng: ĐV 20=17+4−11, 21=17+4−12; Kho 23=18−14, 24=18−15.</li>
+     *   <li>Thực hành nổ súng: 26=8−17, 27=9−18.</li>
      * </ul>
+     * Cột 4 (TT GĐCB) hiện là cơ số chung, chưa tách d/PT nên dùng chung cho cột 20 và 21.
      * Âm → 0. TL tương ứng tính trong {@link #applyTl} từ cơ số 20,21 / 23,24.
      */
     private void applyKhtn(Object[] r) {
-        double v6 = parseCellDouble(r[6]);
+        double v4 = parseCellDouble(r[4]);
         double v8 = parseCellDouble(r[8]);
         double v9 = parseCellDouble(r[9]);
         double v11 = parseCellDouble(r[11]);
@@ -306,12 +307,12 @@ public class Tab5_DanPanelService {
         double v17 = parseCellDouble(r[17]);
         double v18 = parseCellDouble(r[18]);
 
-        r[20] = fmtNonNeg(v17 - v11);
-        r[21] = fmtNonNeg(v17 - v12);
+        r[20] = fmtNonNeg(v17 + v4 - v11);
+        r[21] = fmtNonNeg(v17 + v4 - v12);
         r[23] = fmtNonNeg(v18 - v14);
         r[24] = fmtNonNeg(v18 - v15);
 
-        r[26] = fmtNonNeg(v8 + v6 - v17);
+        r[26] = fmtNonNeg(v8 - v17);
         r[27] = fmtNonNeg(v9 - v18);
     }
 
@@ -326,16 +327,24 @@ public class Tab5_DanPanelService {
         double rPerCs = isLuuDanVatChat(vatChat) ? 1.0 : Math.max(1.0, q[1]);
         double vk = parseVkSafe(r[1]);
 
-        r[3] = computeTlCell(parseCellDouble(r[2]), w1, rPerCs, vk);
-        r[5] = computeTlCell(parseCellDouble(r[4]), w1, rPerCs, vk);
-        r[7] = computeTlCell(parseCellDouble(r[6]), w1, rPerCs, vk);
-        r[10] = computeTlCell(parseCellDouble(r[8]) + parseCellDouble(r[9]), w1, rPerCs, vk);
-        r[13] = computeTlCell(parseCellDouble(r[11]) + parseCellDouble(r[12]), w1, rPerCs, vk);
-        r[16] = computeTlCell(parseCellDouble(r[14]) + parseCellDouble(r[15]), w1, rPerCs, vk);
-        r[19] = computeTlCell(parseCellDouble(r[17]) + parseCellDouble(r[18]), w1, rPerCs, vk);
-        r[22] = computeTlCell(parseCellDouble(r[20]) + parseCellDouble(r[21]), w1, rPerCs, vk);
-        r[25] = computeTlCell(parseCellDouble(r[23]) + parseCellDouble(r[24]), w1, rPerCs, vk);
-        r[28] = computeTlCell(parseCellDouble(r[26]) + parseCellDouble(r[27]), w1, rPerCs, vk);
+        fillTlCell(r, 3, w1, rPerCs, vk, 2);
+        fillTlCell(r, 5, w1, rPerCs, vk, 4);
+        fillTlCell(r, 7, w1, rPerCs, vk, 6);
+        fillTlCell(r, 10, w1, rPerCs, vk, 8, 9);
+        fillTlCell(r, 13, w1, rPerCs, vk, 11, 12);
+        fillTlCell(r, 16, w1, rPerCs, vk, 14, 15);
+        fillTlCell(r, 19, w1, rPerCs, vk, 17, 18);
+        fillTlCell(r, 22, w1, rPerCs, vk, 20, 21);
+        fillTlCell(r, 25, w1, rPerCs, vk, 23, 24);
+        fillTlCell(r, 28, w1, rPerCs, vk, 26, 27);
+    }
+
+    private void fillTlCell(Object[] r, int targetCol, double w1, double rPerCs, double vk, int... sourceCols) {
+        double cs = 0;
+        for (int col : sourceCols) {
+            cs += parseCellDouble(r[col]);
+        }
+        r[targetCol] = computeTlCell(cs, w1, rPerCs, vk);
     }
 
     /**
@@ -691,17 +700,6 @@ public class Tab5_DanPanelService {
     }
 
     /**
-     * Dòng tổng hợp (Toàn d / các dòng tổng súng ở Toàn d): xóa toàn bộ cột cơ số để tránh rối mắt/đúng nghiệp vụ;
-     * giữ cột 0 (tên), tùy chọn cột 1 (VK); các cột TL giữ nguyên (đã là SUM từ cộng dồn).
-     */
-    private void clearTotalsRowKeepVkAndTl(Object[] r, boolean keepVkCount) {
-        if (r == null) {
-            return;
-        }
-        clearCoSoForTotalsRow(r, keepVkCount);
-    }
-
-    /**
      * Xóa (set = "") toàn bộ các cột cơ số ở dòng tổng, chỉ giữ cột 1 và các cột TL.
      * Danh sách cột cơ số theo yêu cầu khách hàng.
      */
@@ -779,27 +777,6 @@ public class Tab5_DanPanelService {
             }
         }
         return false;
-    }
-
-    /** Nếu mọi ô cùng giá trị số → giữ một bản (tránh nhân N khi Hiện có trùng). Ngược lại → cộng. */
-    private String sumOrFirstIfAllEqual(List<Object[]> rows, int col) {
-        if (rows.isEmpty()) {
-            return "0";
-        }
-        double first = parseCellDouble(rows.get(0)[col]);
-        boolean allSame = true;
-        double sum = 0;
-        for (Object[] row : rows) {
-            double v = parseCellDouble(row[col]);
-            sum += v;
-            if (Math.abs(v - first) > 1e-9) {
-                allSame = false;
-            }
-        }
-        if (allSame) {
-            return rows.get(0)[col] != null ? rows.get(0)[col].toString() : "0";
-        }
-        return fmt(sum);
     }
 
     private long parseCellLong(Object o) {
@@ -1113,12 +1090,12 @@ public class Tab5_DanPanelService {
             r[6] = fmt(tieuThuPlusChitiet(s4.tieuThuGdcd, gdcd, dtIdx));
             r[7] = "0";
 
-            double[] dvKhoScd = phaiCoDvKhoFromChitiet(scd, s4.phaiCoScd, dtIdx);
+            double[] dvKhoScd = phaiCoDvKhoFromChitiet(scd, s4.phaiCoScd);
             r[8] = fmt(dvKhoScd[0]);
             r[9] = fmt(dvKhoScd[1]);
             r[10] = "0";
 
-            double[] dvKho04 = phaiCoDvKhoFromChitiet(pc, s4.phaiCo0400, dtIdx);
+            double[] dvKho04 = phaiCoDvKhoFromChitiet(pc, s4.phaiCo0400);
             r[17] = fmt(dvKho04[0]);
             r[18] = fmt(dvKho04[1]);
             r[19] = "0";
@@ -1147,11 +1124,11 @@ public class Tab5_DanPanelService {
             r[5] = "0";
             r[6] = fmt(s4.tieuThuGdcd);
             r[7] = "0";
-            double[] dvKhoScd = phaiCoDvKhoFromChitiet(scd, s4.phaiCoScd, -1);
+            double[] dvKhoScd = phaiCoDvKhoFromChitiet(scd, s4.phaiCoScd);
             r[8] = fmt(dvKhoScd[0]);
             r[9] = fmt(dvKhoScd[1]);
             r[10] = "0";
-            double[] dvKho04 = phaiCoDvKhoFromChitiet(pc, s4.phaiCo0400, -1);
+            double[] dvKho04 = phaiCoDvKhoFromChitiet(pc, s4.phaiCo0400);
             r[17] = fmt(dvKho04[0]);
             r[18] = fmt(dvKho04[1]);
             r[19] = "0";
@@ -1190,14 +1167,15 @@ public class Tab5_DanPanelService {
     }
 
     /**
-     * PC SCĐ (8,9) và PC TQĐ (17,18): từ phai_co_* + pc04/scd_chitiet (6 phần, đồng bộ Tab4).
-     * Nếu tại ô hướng có giá trị &gt; 0: chia đều ĐV/Kho (tránh dồn hết vào cột 17).
-     * Nếu ô hướng = 0 nhưng tổng phai_co_* &gt; 0: chia đều tổng (fallback khi thiếu chi tiết).
+     * PC SCĐ (8,9) và PC TQĐ (17,18): ưu tiên đọc trực tiếp từ *_chitiet theo chuẩn RegulationDetailDialog.
+     * Slot [0] = Kho, slot [1] = Đơn vị. Khi thiếu dữ liệu chi tiết thì fallback chia đều từ phai_co_*.
+     * Trả về theo thứ tự {Đơn vị, Kho} để map đúng cột UI 8/9 và 17/18.
      */
-    private double[] phaiCoDvKhoFromChitiet(double[] chitiet6, double phaiCoTong, int dtIdx) {
-        double slot = (dtIdx >= 0 && dtIdx < 6) ? chitiet6[dtIdx] : 0;
-        if (Math.abs(slot) > 1e-12) {
-            return new double[]{slot * 0.5, slot * 0.5};
+    private double[] phaiCoDvKhoFromChitiet(double[] chitiet6, double phaiCoTong) {
+        double kho = (chitiet6 != null && chitiet6.length > 0) ? chitiet6[0] : 0;
+        double donVi = (chitiet6 != null && chitiet6.length > 1) ? chitiet6[1] : 0;
+        if (Math.abs(kho) + Math.abs(donVi) > 1e-12) {
+            return new double[]{donVi, kho};
         }
         if (Math.abs(phaiCoTong) < 1e-12) {
             return new double[]{0, 0};
@@ -1317,7 +1295,7 @@ public class Tab5_DanPanelService {
      *   <li>cell 29 → UI col 28 (KHTN ThựcHành TL)</li>
      *   <li>cell 30..34 → (ô thừa trong Word - để trống)</li>
      * </ul>
-     * Các dòng UI vượt quá 40 sẽ bị bỏ. Các dòng Word vượt quá số dòng UI → keyword rỗng ("").
+     * Các dòng UI vượt quá 80 sẽ bị bỏ. Các dòng Word vượt quá số dòng UI → keyword rỗng ("").
      */
     public Map<String, String> getExportData(DefaultTableModel danModel) {
         Map<String, String> data = new HashMap<>();
@@ -1344,36 +1322,32 @@ public class Tab5_DanPanelService {
 
             for (int wordCell = 0; wordCell < WORD_CELLS; wordCell++) {
                 String key = "{{dan_r" + wordRow + "_c" + wordCell + "}}";
-                String val = "";
-
-                if (hasData) {
-                    if (wordCell == 0) {
-                        // STT = số thứ tự (dòng trong export, 1-based)
-                        val = String.valueOf(wordRow);
-                    } else if (wordCell == 1) {
-                        // UI col 0: Loại đạn
-                        val = cellStr(uiRow[0]);
-                    } else if (wordCell == 2) {
-                        // UI col 1: Số lượng VK
-                        val = cellStr(uiRow[1]);
-                    } else {
-                        // wordCell 3..29 → UI col (wordCell - 3 + 2) = wordCell - 1
-                        // wordCell 3 → UI col 2
-                        // wordCell 4 → UI col 3
-                        // ...
-                        // wordCell 29 → UI col 28
-                        // wordCell 30..34 → thừa, để trống
-                        int uiCol = wordCell - 1; // cell3→col2, cell4→col3,..., cell29→col28
-                        if (uiCol >= 2 && uiCol < UI_COLS) {
-                            val = cellStr(uiRow[uiCol]);
-                        }
-                        // else val = "" (ô thừa cell 30-34)
-                    }
-                }
+                String val = resolveExportWordCellValue(uiRow, hasData, wordRow, wordCell, UI_COLS);
                 data.put(key, val);
             }
         }
         return data;
+    }
+
+    private String resolveExportWordCellValue(Object[] uiRow, boolean hasData, int wordRow, int wordCell, int uiCols) {
+        if (!hasData || uiRow == null) {
+            return "";
+        }
+        if (wordCell == 0) {
+            return String.valueOf(wordRow);
+        }
+        if (wordCell == 1) {
+            return cellStr(uiRow[0]);
+        }
+        if (wordCell == 2) {
+            return cellStr(uiRow[1]);
+        }
+
+        int uiCol = wordCell - 1; // cell3→col2, ..., cell29→col28
+        if (uiCol >= 2 && uiCol < uiCols) {
+            return cellStr(uiRow[uiCol]);
+        }
+        return "";
     }
 
     /** Chuyển giá trị ô model sang String an toàn. Bỏ giá trị "-" (mask ô Hướng). */
@@ -1401,28 +1375,16 @@ public class Tab5_DanPanelService {
                 for (Map.Entry<String, Object[]> itemEntry : dirMap.entrySet()) {
                     String label = itemEntry.getKey().trim();
                     Object[] row = itemEntry.getValue();
-                    
-                    double tlDv = 0;
-                    double tlKho = 0;
-                    double tlTh = 0;
-                    
-                    try {
-                        if (row[22] != null && !row[22].toString().isBlank() && !"-".equals(row[22])) {
-                            tlDv = Double.parseDouble(row[22].toString().replace(",", "."));
-                        }
-                        if (row[25] != null && !row[25].toString().isBlank() && !"-".equals(row[25])) {
-                            tlKho = Double.parseDouble(row[25].toString().replace(",", "."));
-                        }
-                        if (row[28] != null && !row[28].toString().isBlank() && !"-".equals(row[28])) {
-                            tlTh = Double.parseDouble(row[28].toString().replace(",", "."));
-                        }
-                    } catch (Exception e) {}
-                    
+
+                    double tlDv = parseCellDouble(row[22]);
+                    double tlKho = parseCellDouble(row[25]);
+                    double tlTh = parseCellDouble(row[28]);
+
                     Map<String, Double> valMap = new LinkedHashMap<>();
                     valMap.put(TL_TRUOC_NO_DV, tlDv);
                     valMap.put(TL_TRUOC_NO_KHO, tlKho);
                     valMap.put(TL_THUC_HANH, tlTh);
-                    
+
                     outMap.put(label, valMap);
                 }
                 miniTableDanByDirection.put(huong, outMap);

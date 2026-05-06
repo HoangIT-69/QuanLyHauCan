@@ -153,7 +153,7 @@ public class Tab7_MedicalPanelUI extends JPanel {
         return noTags.replace("&nbsp;", " ").trim();
     }
 
-    private void applyTbbbFromDb() {
+    public void applyTbbbFromDb() {
         Tab7_MedicalPanelService.TbbbFromDb t = service.loadTbbbRatios(sessionId);
         txtTBToanTran.setText(String.valueOf(t.tbToanTran));
         txtBBToanTran.setText(String.valueOf(t.bbToanTran));
