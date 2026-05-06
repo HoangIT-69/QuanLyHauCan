@@ -13,9 +13,12 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import java.awt.*;
+import java.awt.event.MouseEvent;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -41,6 +44,16 @@ public class Step3_MaterialPanelUI extends JPanel {
     private List<Step3_MaterialPanelService.VchcOption> vchcOptions = new ArrayList<>();
 
     private boolean isUpdatingSum = false;
+    private boolean cacHuongEnabled = true;
+    private Set<String> selectedStep2Directions = new LinkedHashSet<>();
+    private final Set<Integer> lockedDirectionColumns = new HashSet<>();
+    private TableCellEditor defaultObjectEditor;
+    private final TableCellEditor readOnlyDirectionEditor = new DefaultCellEditor(new JTextField()) {
+        @Override
+        public boolean isCellEditable(java.util.EventObject anEvent) {
+            return false;
+        }
+    };
 
     public Step3_MaterialPanelUI(DataDeclarationContext parent, String hinhThucTapBai) {
         this.parent = parent;
@@ -72,10 +85,24 @@ public class Step3_MaterialPanelUI extends JPanel {
                 if (column == 3) {
                     return false;
                 }
+                if (isDirectionColumnLocked(column)) {
+                    return false;
+                }
                 return true;
             }
         };
-        table = new JTable(model);
+        table = new JTable(model) {
+            @Override
+            public String getToolTipText(MouseEvent event) {
+                int col = columnAtPoint(event.getPoint());
+                int modelCol = col >= 0 ? convertColumnIndexToModel(col) : -1;
+                if (isDirectionColumnLocked(modelCol)) {
+                    return "Cột phân cấp bị khóa vì hướng tương ứng chưa được chọn ở Bước 2";
+                }
+                return super.getToolTipText(event);
+            }
+        };
+        defaultObjectEditor = table.getDefaultEditor(Object.class);
         table.setRowHeight(40);
         table.setIntercellSpacing(new Dimension(0, 0));
         table.setTableHeader(null);
@@ -106,12 +133,15 @@ public class Step3_MaterialPanelUI extends JPanel {
                 } else if (col == 3) {
                     c.setBackground(new Color(241, 245, 249));
                     c.setFont(new Font("Segoe UI", Font.BOLD, 15));
+                } else if (isDirectionColumnLocked(col)) {
+                    c.setBackground(new Color(234, 236, 240));
+                    c.setFont(new Font("Segoe UI", Font.PLAIN, 15));
                 } else {
                     c.setBackground(Color.WHITE);
                     c.setFont(new Font("Segoe UI", Font.PLAIN, 15));
                 }
 
-                if (isSelected && !ttStr.matches("^(I|II|III|IV|V|VI|VII|VIII|IX|X)$")) {
+                if (isSelected && !ttStr.matches("^(I|II|III|IV|V|VI|VII|VIII|IX|X)$") && !isDirectionColumnLocked(col)) {
                     c.setBackground(new Color(219, 234, 254));
                 }
                 return c;
@@ -212,6 +242,7 @@ public class Step3_MaterialPanelUI extends JPanel {
                     return;
                 }
                 model.removeRow(r);
+                recalculateSum();
                 recalculateTT();
             }
         });
@@ -260,9 +291,11 @@ public class Step3_MaterialPanelUI extends JPanel {
     public void loadDataFromDatabase() {
         reloadCatalogFromDb();
         int sessionId = parent.getCurrentSessionId();
+        loadDirectionLockState(sessionId);
         model.setRowCount(0);
         if (sessionId < 1) {
             initDefaultRows();
+            applyColumnLock();
             return;
         }
 
@@ -284,6 +317,77 @@ public class Step3_MaterialPanelUI extends JPanel {
         }
 
         recalculateTT();
+        applyColumnLock();
+    }
+
+    public void refreshDirectionColumnLockFromStep2() {
+        int sessionId = parent.getCurrentSessionId();
+        loadDirectionLockState(sessionId);
+        applyColumnLock();
+    }
+
+    /**
+     * Khóa cột phân cấp theo lựa chọn hướng ở Bước 2 để tránh nhập sai dữ liệu theo tổ chức lực lượng.
+     */
+    private void applyColumnLock() {
+        lockedDirectionColumns.clear();
+        for (int i = 0; i < phanCount; i++) {
+            int col = 7 + i;
+            boolean lockCol = !cacHuongEnabled || !isDirectionEnabledByStep2Label(phanLabels[i]);
+            if (lockCol) {
+                lockedDirectionColumns.add(col);
+                table.getColumnModel().getColumn(col).setCellEditor(readOnlyDirectionEditor);
+            } else {
+                table.getColumnModel().getColumn(col).setCellEditor(defaultObjectEditor);
+            }
+        }
+        table.repaint();
+    }
+
+    private void loadDirectionLockState(int sessionId) {
+        selectedStep2Directions = new LinkedHashSet<>();
+        cacHuongEnabled = parent.isCacHuongEnabled();
+        if (sessionId <= 0) {
+            return;
+        }
+
+        Step3_MaterialPanelService.Step2SelectionState st = service.loadStep2SelectionState(sessionId);
+        if (st != null) {
+            selectedStep2Directions = new LinkedHashSet<>(st.selectedDirections);
+            cacHuongEnabled = st.cacHuongEnabled;
+        }
+    }
+
+    private boolean isDirectionEnabledByStep2Label(String step3DirectionLabel) {
+        String key = normalizeDirectionLabel(step3DirectionLabel);
+        if (key.isEmpty()) {
+            return false;
+        }
+        for (String s : selectedStep2Directions) {
+            if (normalizeDirectionLabel(s).equals(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizeDirectionLabel(String text) {
+        if (text == null) {
+            return "";
+        }
+        String s = Normalizer.normalize(text, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase()
+                .trim();
+        return s.replaceAll("\\s+", " ");
+    }
+
+    private boolean isDirectionColumnLocked(int column) {
+        return isDirectionColumn(column) && lockedDirectionColumns.contains(column);
+    }
+
+    private boolean isDirectionColumn(int column) {
+        return column >= 7 && column < colNote;
     }
 
     private Object[] newSectionLabelRow(String tt, String col1) {
@@ -458,6 +562,20 @@ public class Step3_MaterialPanelUI extends JPanel {
         return rows;
     }
 
+    private void recalculateSum() {
+        // Recalculate Tổng column for all data rows to avoid floating‑point artifacts
+        for (int i = 0; i < model.getRowCount(); i++) {
+            String ttStr = model.getValueAt(i, 0) != null ? model.getValueAt(i, 0).toString().trim().toUpperCase() : "";
+            if (ttStr.matches("^(I|II|III|IV|V|VI|VII|VIII|IX|X)$")) {
+                continue; // skip section label rows
+            }
+            double kho = InputValidator.parseDoubleSafe(model.getValueAt(i, 4));
+            double donVi = InputValidator.parseDoubleSafe(model.getValueAt(i, 5));
+            double sum = kho + donVi;
+            model.setValueAt(formatDouble(sum), i, 3);
+        }
+    }
+
     private void recalculateTT() {
         int tt = 1;
         for (int i = 0; i < model.getRowCount(); i++) {
@@ -471,10 +589,12 @@ public class Step3_MaterialPanelUI extends JPanel {
     }
 
     private String formatDouble(double d) {
-        if (d == (long) d) {
-            return String.format("%d", (long) d);
-        }
-        return String.format("%s", d).replace(".", ",");
+        // Round to two decimal places and use comma as decimal separator
+        java.math.BigDecimal bd = new java.math.BigDecimal(d).setScale(2, java.math.RoundingMode.HALF_UP);
+        // Remove trailing zeros and decimal point if not needed
+        String txt = bd.stripTrailingZeros().toPlainString();
+        // Replace dot with comma for locale format
+        return txt.replace('.', ',');
     }
 
     private void initDefaultRows() {
@@ -661,11 +781,14 @@ public class Step3_MaterialPanelUI extends JPanel {
             if (tt.matches("^(I|II|III|IV|V|VI|VII|VIII|IX|X)$")) {
                 setBackground(new Color(255, 241, 118));
                 setFont(new Font("Segoe UI", Font.BOLD, 15));
+            } else if (isDirectionColumnLocked(col)) {
+                setBackground(new Color(234, 236, 240));
+                setFont(new Font("Segoe UI", Font.PLAIN, 15));
             } else {
                 setBackground(Color.WHITE);
                 setFont(new Font("Segoe UI", Font.PLAIN, 15));
             }
-            if (isSelected && !tt.matches("^(I|II|III|IV|V|VI|VII|VIII|IX|X)$")) {
+            if (isSelected && !tt.matches("^(I|II|III|IV|V|VI|VII|VIII|IX|X)$") && !isDirectionColumnLocked(col)) {
                 setBackground(new Color(219, 234, 254));
             }
             return this;

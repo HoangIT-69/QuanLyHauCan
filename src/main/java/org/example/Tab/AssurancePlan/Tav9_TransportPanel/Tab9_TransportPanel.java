@@ -223,7 +223,9 @@ public class Tab9_TransportPanel extends JPanel {
                     if (col == 2) { // Cột Đạn
                         Window window = SwingUtilities.getWindowAncestor(Tab9_TransportPanel.this);
                         if (window instanceof Frame) {
-                            java.util.List<String> dirs = service.getDanhSachHuong(sessionId);
+                             java.util.List<String> dirs = new java.util.ArrayList<>();
+                            dirs.add("Toàn đội");
+                            dirs.addAll(service.getDanhSachHuong(sessionId));
                             if (row >= 3 && row <= 5) {
                                 Tab9_DanTransportUI dialog = new Tab9_DanTransportUI((Frame) window, "Giai đoạn chuẩn bị", row, danGdcbAssignments, dirs, updatedMap -> {
                                     danGdcbAssignments = updatedMap;
@@ -248,7 +250,9 @@ public class Tab9_TransportPanel extends JPanel {
                             else if (col == 3) filterCategoryIndex = 3; // VTKT
 
                             final int fCatIdx = filterCategoryIndex;
-                            java.util.List<String> dirs = service.getDanhSachHuong(sessionId);
+                            java.util.List<String> dirs = new java.util.ArrayList<>();
+                            dirs.add("Toàn đội");
+                            dirs.addAll(service.getDanhSachHuong(sessionId));
 
                             if (row >= 3 && row <= 5) {
                                 java.util.Map<String, Integer> currentAssignments = getVchcAssignmentMap(fCatIdx, true);
@@ -813,7 +817,14 @@ public class Tab9_TransportPanel extends JPanel {
             double gdcbDv  = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCB_DV_D, 0.0);
             double gdcdKho = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_KHO, 0.0);
             double gdcdDv  = values.getOrDefault(org.example.Popup.Tab5_VatChatPanel.Tab5_VatChatPanelService.TL_BO_SUNG_GDCD_DV, 0.0);
-            double weight = isGdcb ? (gdcbKho + gdcbDv) : (gdcdKho + gdcdDv);
+            // Theo nghiệp vụ: ở Hướng thì Kho = 0 (chỉ lấy ĐV); Toàn đội mới lấy Kho + ĐV.
+            boolean isToanDoi = "Toàn đội".equalsIgnoreCase(huong) || "Toàn d".equalsIgnoreCase(huong);
+            double weight;
+            if (isGdcb) {
+                weight = isToanDoi ? (gdcbKho + gdcbDv) : gdcbDv;
+            } else {
+                weight = isToanDoi ? (gdcdKho + gdcdDv) : gdcdDv;
+            }
 
             if (isGdcb) {
                 if (assignedRow == 3) weightRow1 += weight;

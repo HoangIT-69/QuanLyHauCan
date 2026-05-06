@@ -1,5 +1,6 @@
 package org.example.Tab.PlanEstimation.Tab8_MaintenancePanel;
 
+import org.example.Tab.PlanEstimation.PnPlanEstimationTextStore;
 import org.example.Utils.InputValidator;
 import org.example.Utils.UIUtils;
 
@@ -32,6 +33,7 @@ public class Tab8_MaintenancePanelUI extends JPanel {
     public Tab8_MaintenancePanelUI(int sessionId) {
         this();
         this.currentSessionId = sessionId;
+        loadTextFromDatabase(sessionId);
         loadDataFromDatabase(sessionId);
     }
 
@@ -94,6 +96,38 @@ public class Tab8_MaintenancePanelUI extends JPanel {
         mainScroll.setBorder(null);
         mainScroll.getVerticalScrollBar().setUnitIncrement(16);
         add(mainScroll, BorderLayout.CENTER);
+    }
+
+    /**
+     * Tải nội dung các JTextArea từ DB (pn_plan_estimation).
+     */
+    private void loadTextFromDatabase(int sessionId) {
+        if (sessionId <= 0) return;
+        PnPlanEstimationTextStore.PlanEstimationRow row = new PnPlanEstimationTextStore().load(sessionId);
+        txtBDChuanBi.setText(row.tab8BdChuanBi);
+        txtBDChienDau.setText(row.tab8BdChienDau);
+        txtBDSauChienDau.setText(row.tab8BdSauCd);
+        txtCanDoi.setText(row.tab8CanDoi);
+        txtSuaChuaChuanBi.setText(row.tab8ScChuanBi);
+        txtSuaChuaChienDau.setText(row.tab8ScChienDau);
+        txtSuaChuaSauChienDau.setText(row.tab8ScSauCd);
+    }
+
+    /**
+     * Lưu nội dung các JTextArea vào DB (pn_plan_estimation).
+     */
+    public void persistToDatabase() {
+        if (currentSessionId <= 0) return;
+        PnPlanEstimationTextStore store = new PnPlanEstimationTextStore();
+        PnPlanEstimationTextStore.PlanEstimationRow row = store.load(currentSessionId);
+        row.tab8BdChuanBi = txtBDChuanBi.getText();
+        row.tab8BdChienDau = txtBDChienDau.getText();
+        row.tab8BdSauCd = txtBDSauChienDau.getText();
+        row.tab8CanDoi = txtCanDoi.getText();
+        row.tab8ScChuanBi = txtSuaChuaChuanBi.getText();
+        row.tab8ScChienDau = txtSuaChuaChienDau.getText();
+        row.tab8ScSauCd = txtSuaChuaSauChienDau.getText();
+        store.save(row);
     }
 
     /**

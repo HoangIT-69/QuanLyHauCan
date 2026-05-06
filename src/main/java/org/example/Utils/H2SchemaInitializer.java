@@ -78,13 +78,23 @@ public class H2SchemaInitializer {
                             "  `ten_bai_tap` VARCHAR(255)," +
                             "  `ngay_tao` DATETIME," +
                             "  `trang_thai` TINYINT," +
-                            "  `hinh_thuc_tap_bai` VARCHAR(255)" +
+                            "  `hinh_thuc_tap_bai` VARCHAR(255)," +
+                            "  `cac_huong_enabled` TINYINT DEFAULT 0," +
+                            "  `step2_selected_huongs` VARCHAR(2000)" +
                             ");"
             );
             try {
                 stmt.executeUpdate("ALTER TABLE sessions ADD COLUMN hinh_thuc_tap_bai VARCHAR(255)");
             } catch (SQLException ignored) {
             }
+                        try {
+                                stmt.executeUpdate("ALTER TABLE sessions ADD COLUMN cac_huong_enabled TINYINT DEFAULT 0");
+                        } catch (SQLException ignored) {
+                        }
+                        try {
+                                stmt.executeUpdate("ALTER TABLE sessions ADD COLUMN step2_selected_huongs VARCHAR(2000)");
+                        } catch (SQLException ignored) {
+                        }
 
             // 6. Bảng step1_thong_tin
             stmt.executeUpdate(
@@ -199,6 +209,17 @@ public class H2SchemaInitializer {
                     "tab12_ket_luan TEXT", "tab12_de_nghi TEXT"
             };
             for (String c : pnTab10_12) {
+                try {
+                    stmt.executeUpdate("ALTER TABLE pn_plan_estimation ADD COLUMN " + c);
+                } catch (SQLException ignored) {
+                }
+            }
+            String[] pnTab8 = {
+                    "tab8_bd_chuan_bi TEXT", "tab8_bd_chien_dau TEXT", "tab8_bd_sau_cd TEXT",
+                    "tab8_can_doi TEXT",
+                    "tab8_sc_chuan_bi TEXT", "tab8_sc_chien_dau TEXT", "tab8_sc_sau_cd TEXT"
+            };
+            for (String c : pnTab8) {
                 try {
                     stmt.executeUpdate("ALTER TABLE pn_plan_estimation ADD COLUMN " + c);
                 } catch (SQLException ignored) {

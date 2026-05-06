@@ -329,9 +329,13 @@ public class Tab8_MaintPlanPanelUI extends JPanel {
 
         int rowCount = modelSuaChua.getRowCount();
         for (int i = 0; i < rowCount; i++) {
-            int r = i + 1; // 1-based index for placeholder keys
+            int legacyIndex = i + 1;
+            int templateIndex = i + 3;
             for (int c = 2; c <= 16; c++) {
-                data.put("{{sc_" + colKeys[c-2] + "_" + r + "}}", getVal(i, c));
+                String value = getVal(i, c);
+                String keySuffix = colKeys[c - 2];
+                data.put("{{sc_" + keySuffix + "_" + legacyIndex + "}}", value);
+                data.put("{{sc_" + keySuffix + "_" + templateIndex + "}}", value);
             }
         }
         return data;

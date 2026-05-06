@@ -21,4 +21,12 @@ public interface DataDeclarationContext {
     boolean saveStep2ToDatabase();
 
     boolean saveStep3ToDatabase();
+
+    boolean isCacHuongEnabled();
+
+    /**
+     * Phát tín hiệu cho các panel Kế hoạch / Dự kiến biết rằng dữ liệu khai báo đã thay đổi,
+     * để chúng chỉ refresh bảng dữ liệu (không recreate panel).
+     */
+    void notifyPlanningPanelsDeclarationChanged();
 }

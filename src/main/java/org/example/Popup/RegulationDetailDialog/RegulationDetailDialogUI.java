@@ -9,12 +9,17 @@ import javax.swing.border.LineBorder;
 import javax.swing.event.TableModelEvent;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellEditor;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.text.Normalizer;
 
 /**
- * Chi tiết phân cấp dạng JTable: Tổng (+) từ tab cha; Kho/Đơn vị khóa, tự tính từ phân cấp;
+ * Chi tiết phân cấp dạng JTable: Tổng (+) từ tab cha; Kho tự tính theo Tổng - Đơn vị;
  * cột phân cấp 5 (Phòng ngự) hoặc 6 (Tiến công). Đồng bộ {@link RegulationDetailDialogService#detailDataStore} theo thời gian thực.
  */
 public class RegulationDetailDialogUI extends JDialog {
@@ -29,6 +34,7 @@ public class RegulationDetailDialogUI extends JDialog {
     private final DefaultTableModel parentModel;
     private final int targetColumn;
     private final String hinhThucTapBai;
+    private final int sessionId;
 
     private DefaultTableModel detailModel;
     private JTable table;
@@ -43,16 +49,30 @@ public class RegulationDetailDialogUI extends JDialog {
     private final int totalCols;
     private final int totalTableWidth;
 
+    private boolean cacHuongEnabled = true;
+    private Set<String> selectedStep2Directions = new LinkedHashSet<>();
+    private final Set<Integer> lockedPhanColumns = new HashSet<>();
+    private TableCellEditor defaultObjectEditor;
+    private final TableCellEditor readOnlyDirectionEditor = new DefaultCellEditor(new JTextField()) {
+        @Override
+        public boolean isCellEditable(java.util.EventObject anEvent) {
+            return false;
+        }
+    };
+
     public RegulationDetailDialogUI(Frame owner, String tableName, DefaultTableModel parentModel,
-                                    int targetColumn, String hinhThucTapBai) {
+                                    int targetColumn, String hinhThucTapBai, int sessionId) {
         super(owner, "Khai báo chi tiết: " + tableName, true);
         this.parentModel = parentModel;
         this.targetColumn = targetColumn;
         this.hinhThucTapBai = hinhThucTapBai != null ? hinhThucTapBai : "";
+        this.sessionId = sessionId;
 
         this.phanLabels = RegulationDetailDialogService.phanCapLabels(this.hinhThucTapBai);
         this.phanCount = phanLabels.length;
         this.totalCols = COL_PHAN_START + phanCount;
+
+        loadDirectionLockState();
 
         this.colWidths = buildColumnWidths();
         this.totalTableWidth = sumWidths();
@@ -73,11 +93,15 @@ public class RegulationDetailDialogUI extends JDialog {
         detailModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column >= COL_PHAN_START && column < COL_PHAN_START + phanCount;
+                if (column == COL_DON_VI) {
+                    return true;
+                }
+                return column >= COL_PHAN_START && column < COL_PHAN_START + phanCount && !isPhanColumnLocked(column);
             }
         };
 
         table = new JTable(detailModel);
+        defaultObjectEditor = table.getDefaultEditor(Object.class);
         table.setRowHeight(36);
         table.setIntercellSpacing(new Dimension(0, 0));
         table.setTableHeader(null);
@@ -91,6 +115,7 @@ public class RegulationDetailDialogUI extends JDialog {
         }
 
         setupRenderers(totalCols);
+        applyColumnLock();
 
         detailModel.addTableModelListener(this::onDetailTableChanged);
 
@@ -154,6 +179,74 @@ public class RegulationDetailDialogUI extends JDialog {
         add(pnlSouth, BorderLayout.SOUTH);
 
         syncDataFromParent();
+        applyColumnLock();
+    }
+
+    /**
+     * Khóa các cột phân cấp chưa được khai báo ở Bước 2 để bảo toàn tính nhất quán dữ liệu.
+     */
+    private void applyColumnLock() {
+        lockedPhanColumns.clear();
+
+        // Session cũ có thể chưa có dữ liệu Step 2 chuẩn hóa; khi chưa xác định được thì không khóa cứng toàn bộ.
+        if (selectedStep2Directions.isEmpty()) {
+            for (int i = 0; i < phanCount; i++) {
+                int col = COL_PHAN_START + i;
+                table.getColumnModel().getColumn(col).setCellEditor(defaultObjectEditor);
+            }
+            table.repaint();
+            return;
+        }
+
+        for (int i = 0; i < phanCount; i++) {
+            int col = COL_PHAN_START + i;
+            boolean lockCol = !cacHuongEnabled || !isDirectionEnabledByStep2Label(phanLabels[i]);
+            if (lockCol) {
+                lockedPhanColumns.add(col);
+                table.getColumnModel().getColumn(col).setCellEditor(readOnlyDirectionEditor);
+            } else {
+                table.getColumnModel().getColumn(col).setCellEditor(defaultObjectEditor);
+            }
+        }
+        table.repaint();
+    }
+
+    private void loadDirectionLockState() {
+        selectedStep2Directions = new LinkedHashSet<>();
+        cacHuongEnabled = false;
+        RegulationDetailDialogService.Step2SelectionState st = RegulationDetailDialogService.loadStep2SelectionState(sessionId);
+        if (st != null) {
+            cacHuongEnabled = st.cacHuongEnabled;
+            selectedStep2Directions = new LinkedHashSet<>(st.selectedDirections);
+        }
+    }
+
+    private boolean isDirectionEnabledByStep2Label(String stepLabel) {
+        String key = normalizeDirectionLabel(stepLabel);
+        if (key.isEmpty()) {
+            return false;
+        }
+        for (String s : selectedStep2Directions) {
+            if (normalizeDirectionLabel(s).equals(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizeDirectionLabel(String text) {
+        if (text == null) {
+            return "";
+        }
+        String s = Normalizer.normalize(text, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase()
+                .trim();
+        return s.replaceAll("\\s+", " ");
+    }
+
+    private boolean isPhanColumnLocked(int column) {
+        return column >= COL_PHAN_START && column < totalCols && lockedPhanColumns.contains(column);
     }
 
     private int[] buildColumnWidths() {
@@ -189,7 +282,7 @@ public class RegulationDetailDialogUI extends JDialog {
         if (col == TableModelEvent.ALL_COLUMNS) {
             return;
         }
-        if (col < COL_PHAN_START || col >= totalCols) {
+        if (col != COL_DON_VI && (col < COL_PHAN_START || col >= totalCols)) {
             return;
         }
         int row = e.getFirstRow();
@@ -198,27 +291,7 @@ public class RegulationDetailDialogUI extends JDialog {
         }
 
         double tongRef = tongSoLuongPerRow.get(row);
-        double sumPhan = sumPhanCapForRow(row);
-
-        if (sumPhan > tongRef + 1e-9) {
-            final int r = row;
-            final int c = col;
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this,
-                        "Tổng phân cấp không được vượt quá Tổng số lượng (+). Giá trị vừa nhập được đặt lại về 0.",
-                        "Cảnh báo",
-                        JOptionPane.WARNING_MESSAGE);
-                isProgrammaticUpdate = true;
-                try {
-                    detailModel.setValueAt("0", r, c);
-                } finally {
-                    isProgrammaticUpdate = false;
-                }
-            });
-            return;
-        }
-
-        applyKhoDonViAndSyncStore(row, tongRef, sumPhan);
+        recalculateKhoAndSyncStore(row, tongRef);
     }
 
     private double sumPhanCapForRow(int row) {
@@ -229,9 +302,9 @@ public class RegulationDetailDialogUI extends JDialog {
         return s;
     }
 
-    private void applyKhoDonViAndSyncStore(int row, double tongRef, double sumPhan) {
-        double donVi = sumPhan;
-        double kho = tongRef - donVi;
+    private void recalculateKhoAndSyncStore(int row, double tongRef) {
+        double donVi = InputValidator.parseDoubleSafe(detailModel.getValueAt(row, COL_DON_VI));
+        double kho = RegulationDetailDialogService.roundToTwoDecimals(tongRef - donVi);
 
         isProgrammaticUpdate = true;
         try {
@@ -301,8 +374,7 @@ public class RegulationDetailDialogUI extends JDialog {
             detailModel.addRow(row);
 
             int r = detailModel.getRowCount() - 1;
-            double sumPhan = sumPhanCapForRow(r);
-            applyKhoDonViAndSyncStore(r, tongRef, sumPhan);
+            recalculateKhoAndSyncStore(r, tongRef);
         }
     }
 
@@ -314,10 +386,11 @@ public class RegulationDetailDialogUI extends JDialog {
     }
 
     private static String formatDisplay(double d) {
+        d = RegulationDetailDialogService.roundToTwoDecimals(d);
         if (d == (long) d) {
             return String.format("%d", (long) d);
         }
-        return String.valueOf(d).replace(".", ",");
+        return java.math.BigDecimal.valueOf(d).stripTrailingZeros().toPlainString().replace(".", ",");
     }
 
     /**
@@ -355,7 +428,10 @@ public class RegulationDetailDialogUI extends JDialog {
         if (v == null) {
             return "0";
         }
-        return v.toString().trim().replace(",", ".");
+        double value = InputValidator.parseDoubleSafe(v);
+        return java.math.BigDecimal.valueOf(RegulationDetailDialogService.roundToTwoDecimals(value))
+                .stripTrailingZeros()
+                .toPlainString();
     }
 
     private void setupRenderers(int colCount) {
@@ -366,7 +442,7 @@ public class RegulationDetailDialogUI extends JDialog {
                 setHorizontalAlignment(col == COL_NAME ? SwingConstants.LEFT : SwingConstants.CENTER);
                 ((JComponent) c).setBorder(BorderFactory.createLineBorder(new Color(224, 224, 224), 1));
 
-                boolean readOnly = col <= COL_DON_VI;
+                boolean readOnly = col != COL_DON_VI && col < COL_PHAN_START;
                 if (readOnly) {
                     c.setBackground(new Color(241, 245, 249));
                     c.setForeground(new Color(71, 85, 105));
@@ -377,13 +453,24 @@ public class RegulationDetailDialogUI extends JDialog {
                         c.setFont(c.getFont().deriveFont(Font.PLAIN));
                     }
                 } else {
-                    c.setBackground(Color.WHITE);
-                    c.setForeground(Color.BLACK);
-                    c.setFont(c.getFont().deriveFont(Font.PLAIN));
+                    if (isPhanColumnLocked(col)) {
+                        c.setBackground(new Color(234, 236, 240));
+                        c.setForeground(new Color(100, 116, 139));
+                        c.setFont(c.getFont().deriveFont(Font.PLAIN));
+                    } else {
+                        c.setBackground(Color.WHITE);
+                        c.setForeground(Color.BLACK);
+                        c.setFont(c.getFont().deriveFont(Font.PLAIN));
+                    }
                 }
 
-                if (isSelected && col >= COL_PHAN_START) {
+                if (isSelected && ((col == COL_DON_VI) || (col >= COL_PHAN_START && !isPhanColumnLocked(col)))) {
                     c.setBackground(new Color(219, 234, 254));
+                }
+                if (isPhanColumnLocked(col)) {
+                    ((JComponent) c).setToolTipText("Cột phân cấp bị khóa vì hướng tương ứng chưa khai báo ở Bước 2");
+                } else {
+                    ((JComponent) c).setToolTipText(null);
                 }
                 return c;
             }

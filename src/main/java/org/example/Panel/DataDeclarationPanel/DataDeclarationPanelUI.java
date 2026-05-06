@@ -101,6 +101,10 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
         cardLayout.show(cardPanel, "Step" + step);
         updateStepperUI(step);
 
+        if (step == 3) {
+            step3Panel.refreshDirectionColumnLockFromStep2();
+        }
+
         if (step == 4) {
             step4Panel.refreshData();
         }
@@ -119,6 +123,18 @@ public class DataDeclarationPanelUI extends JPanel implements DataDeclarationCon
     @Override
     public boolean saveStep3ToDatabase() {
         return step3Panel != null && step3Panel.saveToDatabasePublic();
+    }
+
+    @Override
+    public boolean isCacHuongEnabled() {
+        return step2Panel != null && step2Panel.isCacHuongEnabled();
+    }
+
+    @Override
+    public void notifyPlanningPanelsDeclarationChanged() {
+        if (wizardSessionPersistedListener != null && currentSessionId > 0) {
+            wizardSessionPersistedListener.accept(currentSessionId);
+        }
     }
 
     private void updateStepperUI(int step) {

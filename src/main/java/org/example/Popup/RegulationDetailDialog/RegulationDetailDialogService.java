@@ -1,8 +1,17 @@
 package org.example.Popup.RegulationDetailDialog;
 
+import org.example.Utils.DBConnection;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Lưu chi tiết phân cấp theo khóa {@code vatChat + "_" + targetColumn} (chỉ số cột bảng Step 4).
@@ -16,6 +25,16 @@ public final class RegulationDetailDialogService {
     public static final String[] DEFAULT_EIGHT = {"", "", "", "", "", "", "", ""};
 
     private RegulationDetailDialogService() {
+    }
+
+    public static final class Step2SelectionState {
+        public final boolean cacHuongEnabled;
+        public final Set<String> selectedDirections;
+
+        public Step2SelectionState(boolean cacHuongEnabled, Set<String> selectedDirections) {
+            this.cacHuongEnabled = cacHuongEnabled;
+            this.selectedDirections = selectedDirections != null ? selectedDirections : new LinkedHashSet<>();
+        }
     }
 
     public static boolean isPhongNgu(String hinhThucTapBai) {
@@ -82,14 +101,22 @@ public final class RegulationDetailDialogService {
         detailDataStore.put(key, row);
     }
 
+    public static double roundToTwoDecimals(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return 0;
+        }
+        return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
     private static String toStoreToken(double d) {
+        d = roundToTwoDecimals(d);
         if (Double.isNaN(d) || Double.isInfinite(d) || d == 0) {
             return "";
         }
         if (d == (long) d) {
             return String.format("%d", (long) d);
         }
-        return String.valueOf(d);
+        return BigDecimal.valueOf(d).stripTrailingZeros().toPlainString();
     }
 
     /**
@@ -132,13 +159,66 @@ public final class RegulationDetailDialogService {
         return s.trim().replace(",", ".");
     }
 
-    /**
-     * @return null nếu hợp lệ; ngược lại thông báo lỗi
-     */
-    public static String validateDonViVsTong(double tongSoLuong, double sumPhanCap) {
-        if (sumPhanCap > tongSoLuong + 1e-9) {
-            return "Số lượng phân cấp không được vượt quá Tổng số lượng hiện có!";
+    public static Step2SelectionState loadStep2SelectionState(int sessionId) {
+        Set<String> selected = new LinkedHashSet<>();
+        boolean enabled = false;
+        if (sessionId <= 0) {
+            return new Step2SelectionState(false, selected);
         }
-        return null;
+
+        try (Connection conn = DBConnection.getConnection()) {
+            if (conn == null) {
+                return new Step2SelectionState(false, selected);
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT cac_huong_enabled, step2_selected_huongs FROM sessions WHERE id = ?")) {
+                ps.setInt(1, sessionId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        enabled = rs.getInt("cac_huong_enabled") == 1;
+                        selected = parseDirections(rs.getString("step2_selected_huongs"));
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+
+            if (selected.isEmpty()) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT DISTINCT huong FROM step2_bien_che WHERE session_id = ?")) {
+                    ps.setInt(1, sessionId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String huong = rs.getString("huong");
+                            if (huong != null && !huong.isBlank()) {
+                                selected.add(huong.trim());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Ưu tiên dữ liệu hướng thực tế: có hướng thì xem như đã bật phân cấp, kể cả cờ cũ chưa được cập nhật.
+            if (!selected.isEmpty()) {
+                enabled = true;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new Step2SelectionState(enabled, selected);
+    }
+
+    private static Set<String> parseDirections(String raw) {
+        Set<String> out = new LinkedHashSet<>();
+        if (raw == null || raw.isBlank()) {
+            return out;
+        }
+        String[] items = raw.split("\\|");
+        for (String s : items) {
+            if (s != null && !s.isBlank()) {
+                out.add(s.trim());
+            }
+        }
+        return out;
     }
 }

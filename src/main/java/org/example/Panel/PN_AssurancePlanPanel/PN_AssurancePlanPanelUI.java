@@ -320,4 +320,48 @@ public class PN_AssurancePlanPanelUI extends JPanel {
         menuPanel.add(btn);
         menuPanel.add(Box.createVerticalStrut(2));
     }
+
+    public int getSessionId() {
+        return sessionId;
+    }
+
+    public void onDeclarationDataChanged() {
+        refreshHeaderFromDeclaration();
+        refreshDataTablesOnly();
+    }
+
+    private void refreshHeaderFromDeclaration() {
+        PN_AssurancePlanPanelService.ThongTinChungLoad load = panelService.loadThongTinChung(sessionId);
+        if (load == null) {
+            return;
+        }
+        if (lblTitle != null) {
+            lblTitle.setText(load.fullTitle);
+        }
+        thongTinChungData.clear();
+        if (load.wordPlaceholders != null) {
+            thongTinChungData.putAll(load.wordPlaceholders);
+        }
+    }
+
+    /**
+     * Chỉ làm mới dữ liệu ở các bảng, không reset text area hay control khác.
+     */
+    public void refreshDataTablesOnly() {
+        if (tab4 != null) {
+            tab4.loadDataFromDatabase(sessionId);
+        }
+        if (tab5 != null) {
+            tab5.loadSessionData(sessionId);
+        }
+        if (tab7 != null) {
+            tab7.loadDataFromDatabase(sessionId);
+        }
+        if (tab8 != null) {
+            tab8.loadDataFromDatabase(sessionId);
+        }
+        if (tab11 != null) {
+            tab11.refreshCommanderFieldsFromDeclaration();
+        }
+    }
 }

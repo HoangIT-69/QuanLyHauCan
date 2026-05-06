@@ -33,6 +33,7 @@ public class MaterialRegulationTabUI extends JPanel {
 
     private final MaterialRegulationTabService service = new MaterialRegulationTabService();
     private final String hinhThucTapBai;
+    private int currentSessionId = -1;
 
     private DefaultTableModel model;
     private JTable table;
@@ -180,6 +181,7 @@ public class MaterialRegulationTabUI extends JPanel {
     }
 
     public void loadDataFromDatabase(int sessionId) {
+        this.currentSessionId = sessionId;
         model.setRowCount(0);
         RegulationDetailDialogService.detailDataStore.clear();
         initBaseRows();
@@ -398,7 +400,7 @@ public class MaterialRegulationTabUI extends JPanel {
             return;
         }
         Frame owner = (Frame) SwingUtilities.getWindowAncestor(this);
-        RegulationDetailDialogUI dialog = new RegulationDetailDialogUI(owner, title, model, colIndex, hinhThucTapBai);
+        RegulationDetailDialogUI dialog = new RegulationDetailDialogUI(owner, title, model, colIndex, hinhThucTapBai, currentSessionId);
         dialog.setVisible(true);
     }
 

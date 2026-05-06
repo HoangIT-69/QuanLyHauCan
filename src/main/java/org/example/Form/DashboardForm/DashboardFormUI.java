@@ -38,6 +38,7 @@ public class DashboardFormUI extends JFrame {
     private String hinhThucTapBai;
 
     private PN_PlanEstimationPanelUI currentPlanPanel;
+    private PN_AssurancePlanPanelUI currentAssurancePanel;
 
     public DashboardFormUI(int userId, String username, String role, String hinhThuc) {
         this.currentUserId = userId;
@@ -247,6 +248,9 @@ public class DashboardFormUI extends JFrame {
 
     private void updateDeclarationPanel(int sessionId) {
         this.currentSessionId = sessionId;
+        // Session thay đổi → xóa cache cũ
+        this.currentPlanPanel = null;
+        this.currentAssurancePanel = null;
 
         for (Component comp : mainContentPanel.getComponents()) {
             if (comp instanceof DataDeclarationPanelUI
@@ -279,26 +283,37 @@ public class DashboardFormUI extends JFrame {
     private void syncPlanPanelsAfterWizardSessionCreated(int sessionId) {
         this.currentSessionId = sessionId;
 
-        for (Component comp : mainContentPanel.getComponents()) {
-            if (comp instanceof PN_PlanEstimationPanelUI || comp instanceof DuKienTienCongPlaceholder) {
-                mainContentPanel.remove(comp);
-                break;
-            }
-        }
-        JComponent duKien = createDuKienPanel(currentSessionId);
-        mainContentPanel.add(duKien, "DuKien");
-        this.currentPlanPanel = duKien instanceof PN_PlanEstimationPanelUI
-                ? (PN_PlanEstimationPanelUI) duKien
-                : null;
-
-        if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
+        // Nếu panel DuKien đã cache đúng sessionId, chỉ notify refresh bảng, không recreate
+        if (currentPlanPanel != null && currentPlanPanel.getSessionId() == sessionId) {
+            currentPlanPanel.onDeclarationDataChanged();
+        } else {
             for (Component comp : mainContentPanel.getComponents()) {
-                if (comp instanceof PN_AssurancePlanPanelUI || comp instanceof KeHoachTienCongPlaceholder) {
+                if (comp instanceof PN_PlanEstimationPanelUI || comp instanceof DuKienTienCongPlaceholder) {
                     mainContentPanel.remove(comp);
                     break;
                 }
             }
-            mainContentPanel.add(createKeHoachPanel(), "KeHoach");
+            JComponent duKien = createDuKienPanel(currentSessionId);
+            mainContentPanel.add(duKien, "DuKien");
+            this.currentPlanPanel = duKien instanceof PN_PlanEstimationPanelUI
+                    ? (PN_PlanEstimationPanelUI) duKien
+                    : null;
+        }
+
+        // Nếu panel KeHoach đã cache đúng sessionId, chỉ notify refresh bảng, không recreate
+        if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
+            if (currentAssurancePanel != null && currentAssurancePanel.getSessionId() == sessionId) {
+                currentAssurancePanel.onDeclarationDataChanged();
+            } else {
+                for (Component comp : mainContentPanel.getComponents()) {
+                    if (comp instanceof PN_AssurancePlanPanelUI || comp instanceof KeHoachTienCongPlaceholder) {
+                        mainContentPanel.remove(comp);
+                        break;
+                    }
+                }
+                mainContentPanel.add(createKeHoachPanel(), "KeHoach");
+                this.currentAssurancePanel = null; // sẽ được set khi user mở KeHoach
+            }
         }
 
         mainContentPanel.revalidate();
@@ -373,9 +388,16 @@ public class DashboardFormUI extends JFrame {
     }
 
     /**
-     * Mở tab Kế hoạch: với tập bài Phòng ngự — làm nóng DB + preload ngoài EDT (SwingWorker), rồi tạo panel trên {@code done()}.
+     * Mở tab Kế hoạch: nếu panel đã tồn tại với cùng sessionId thì chỉ show, không rebuild.
+     * Với tập bài Phòng ngự — làm nóng DB + preload ngoài EDT (SwingWorker), rồi tạo panel trên {@code done()}.
      */
     private void openKeHoachCard() {
+        // Nếu panel cache đã có và cùng sessionId, chỉ show — không recreate
+        if (currentAssurancePanel != null
+                && currentAssurancePanel.getSessionId() == currentSessionId) {
+            cardLayout.show(mainContentPanel, "KeHoach");
+            return;
+        }
         AssuranceInputSnapshot snap = snapshotAssuranceInputsFromPlanPanel();
 
         if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
@@ -451,11 +473,14 @@ public class DashboardFormUI extends JFrame {
         }
 
         if (hinhThucTapBai != null && hinhThucTapBai.contains("Phòng ngự")) {
-            mainContentPanel.add(new PN_AssurancePlanPanelUI(
+            PN_AssurancePlanPanelUI newPanel = new PN_AssurancePlanPanelUI(
                     snap.danhGia(), snap.nhiemVu(), snap.dataTab6(), snap.dataTab10(), snap.dataTab11(),
-                    this.currentSessionId, new PN_AssurancePlanPanelService(), preloadedChung), "KeHoach");
+                    this.currentSessionId, new PN_AssurancePlanPanelService(), preloadedChung);
+            mainContentPanel.add(newPanel, "KeHoach");
+            this.currentAssurancePanel = newPanel;
         } else {
             mainContentPanel.add(new KeHoachTienCongPlaceholder(), "KeHoach");
+            this.currentAssurancePanel = null;
         }
 
         mainContentPanel.revalidate();

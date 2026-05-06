@@ -180,6 +180,9 @@ public class Step1_DocumentInfoPanelUI extends JPanel {
         }
         if (result.getNewSessionId() != null) {
             parent.setCurrentSessionId(result.getNewSessionId());
+        } else {
+            // Session đã tồn tại: cần phát tín hiệu để Dự kiến/Kế hoạch refresh dữ liệu phụ thuộc Step 1.
+            parent.notifyPlanningPanelsDeclarationChanged();
         }
         return true;
     }
